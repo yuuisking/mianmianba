@@ -1,11 +1,7 @@
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-8a8b513540294ed0bda785020bb1d269',
-  baseURL: 'https://api.deepseek.com/v1',
-});
+import { getDeepseekClient } from "./deepseek";
 
 export async function summarizeDocument(text: string, existingContent?: string) {
+  const openai = getDeepseekClient();
   let rawText = text;
 
   // Check if text is a URL

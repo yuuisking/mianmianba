@@ -1,11 +1,7 @@
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-8a8b513540294ed0bda785020bb1d269',
-  baseURL: 'https://api.deepseek.com/v1',
-});
+import { getDeepseekClient } from "./deepseek";
 
 export async function routeContent(title: string, summary: string, kbTree: any): Promise<{ subject: string; topic: string }> {
+  const openai = getDeepseekClient();
   const prompt = `
 You are an intelligent knowledge base router. Your task is to categorize a new article into an existing knowledge base tree, or create a suitable new category/topic if it doesn't fit anywhere.
 

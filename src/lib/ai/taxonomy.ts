@@ -1,11 +1,7 @@
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-8a8b513540294ed0bda785020bb1d269',
-  baseURL: 'https://api.deepseek.com/v1',
-});
+import { getDeepseekClient } from "./deepseek";
 
 export async function generateTaxonomy(kbId: string, description: string) {
+  const openai = getDeepseekClient();
   const prompt = `
 Please generate a systematic taxonomy (learning outline) for the topic "${kbId}".
 ${description ? `Additional context: ${description}` : ''}
