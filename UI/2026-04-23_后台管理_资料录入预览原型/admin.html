@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后台管理 · 资料录入与预览（原型）</title>
+    <link rel="stylesheet" href="./assets/anthropic-ui.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-mark"></div>
+          <div>
+            <div class="brand-title">后台管理 · 资料录入</div>
+            <div class="brand-sub">上传链接/文档 → 预览 → 人工确认入库（轻量版）</div>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <span class="chip">不做花哨编辑器</span>
+          <button class="btn" id="btnOpenLearning">打开学习中心预览</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="page">
+      <div class="shell">
+        <!-- Left: ingest form -->
+        <aside class="panel left">
+          <div class="panel-header">
+            <div class="panel-title">创建归纳预览</div>
+            <span class="chip">Ingest</span>
+          </div>
+          <div class="panel-body">
+            <div class="notice" style="margin-bottom: 12px">
+              你只需要提供来源（GitHub 链接或文件）。系统（归纳模型）会输出“知识点预览”，人工确认后再入库到体系中。
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <div class="label">目标知识库</div>
+                <select id="kb"></select>
+              </div>
+              <div class="field">
+                <div class="label">目标分类</div>
+                <select id="category"></select>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="label">GitHub 文档链接（可选）</div>
+              <input id="githubUrl" type="url" placeholder="例如：https://github.com/xxx/xxx/blob/main/notes/java.md" />
+            </div>
+
+            <div class="field">
+              <div class="label">上传文档文件（可选）</div>
+              <input id="fileInput" type="file" />
+              <div class="muted" style="font-size: 12px; margin-top: 6px">
+                原型说明：若为纯文本/markdown，可读取片段用于预览；PDF/DOCX 仅展示文件信息（真实产品可走后端解析）。
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap">
+              <button class="btn btn-primary" id="btnGenerate">生成预览</button>
+              <button class="btn" id="btnCreateJob">创建待确认任务</button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Center: preview -->
+        <main class="panel">
+          <div class="panel-header">
+            <div class="panel-title">预览（归纳后的体系内容）</div>
+            <span class="chip">Preview</span>
+          </div>
+          <div class="panel-body">
+            <h2 style="margin: 0 0 10px 0" id="previewTitle">（未生成预览）</h2>
+            <div id="previewBody"></div>
+          </div>
+        </main>
+
+        <!-- Right: job queue -->
+        <aside class="panel right">
+          <div class="panel-header">
+            <div class="panel-title">待确认队列</div>
+            <span class="chip">Queue</span>
+          </div>
+          <div class="panel-body">
+            <div id="jobList" class="list"></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script src="./assets/admin-lite.js"></script>
+  </body>
+</html>
+

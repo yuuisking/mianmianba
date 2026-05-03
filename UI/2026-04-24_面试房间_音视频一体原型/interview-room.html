@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>面试房间 · 语音 + 视频（原型）</title>
+    <link rel="stylesheet" href="./assets/anthropic-ui.css" />
+  </head>
+
+  <body>
+    <div class="page">
+      <div class="room">
+        <!-- Row 1: Two equal panels (AI interviewer / user video) -->
+        <div class="stage-row">
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title">AI 面试官</div>
+              <span class="chip"><span class="muted">模式</span> <strong>语音 + 追问</strong></span>
+            </div>
+            <div class="panel-body">
+              <div class="stage" aria-label="AI 面试官占位">
+                <div class="avatar" style="place-items:center;">
+                  <div class="avatar-badge">
+                    <div class="avatar-initials">AI</div>
+                  </div>
+                </div>
+                <div class="stage-overlay">
+                  <div class="who"><span class="dot"></span> 在线</div>
+                  <div class="who"><span class="muted">风格：</span>结构化追问</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div class="panel-title">用户 · <span id="userNameLabel">杨宇</span></div>
+              <span class="chip"><span class="muted">点击摄像头</span> <strong>切换视频/头像</strong></span>
+            </div>
+            <div class="panel-body">
+              <div class="stage" aria-label="用户视频/头像区">
+                <video id="video" autoplay playsinline muted></video>
+                <div class="avatar" id="avatar" aria-label="头像占位">
+                  <div class="avatar-badge">
+                    <div class="avatar-initials" id="userInitial">宇</div>
+                  </div>
+                </div>
+                <div class="stage-overlay">
+                  <div class="who"><span id="presenceDot" class="dot off"></span> 语音采集中</div>
+                  <div id="wave" class="wave off" aria-label="语音波动">
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Row 2: subtitles (new lines push old lines up) -->
+        <div class="subtitle-panel panel" aria-label="面试官提问的实时字幕">
+          <div class="panel-header">
+            <div class="panel-title">实时字幕</div>
+            <span class="chip"><span class="muted">说明</span> <strong>新问题追加，自动滚动</strong></span>
+          </div>
+          <div class="panel-body">
+            <div id="subtitleList" class="subtitle-list" aria-label="字幕列表"></div>
+          </div>
+        </div>
+
+        <!-- Row 3: timer + circular controls -->
+        <div class="controls" aria-label="计时与控制">
+          <div class="timer-bar">
+            <div class="t">面试时间</div>
+            <div class="time" id="timer">00:00</div>
+          </div>
+          <div class="control-row">
+            <div class="circle" id="micBtn" role="button" tabindex="0" aria-label="麦克风">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M5 11a7 7 0 0 0 14 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="circle end" id="endBtn" role="button" tabindex="0" aria-label="结束面试">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7.2 10.1c.9-1 2.5-1.7 4.8-1.7s3.9.7 4.8 1.7c.5.6.8 1.4.8 2.3v1.8a2 2 0 0 1-2 2H8.4a2 2 0 0 1-2-2v-1.8c0-.9.3-1.7.8-2.3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M9 14h0M15 14h0" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="circle" id="camBtn" role="button" tabindex="0" aria-label="摄像头">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6.5 8.2h8.2a2.2 2.2 0 0 1 2.2 2.2v3.2a2.2 2.2 0 0 1-2.2 2.2H6.5a2.2 2.2 0 0 1-2.2-2.2v-3.2a2.2 2.2 0 0 1 2.2-2.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M16.9 11l2.7-1.7v5.4L16.9 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="footnote">原型：点击摄像头/麦克风会请求浏览器权限；字幕为模拟追加（后续接入实时转写）。</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./assets/interview-room.js"></script>
+  </body>
+</html>

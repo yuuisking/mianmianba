@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>学习中心 · 体系化知识库（原型）</title>
+    <link rel="stylesheet" href="./assets/anthropic-ui.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand" onclick="location.hash = '#/'" style="cursor: pointer" title="返回知识库列表">
+          <div class="brand-mark"></div>
+          <div>
+            <div class="brand-title">面试系统 · 学习中心</div>
+            <div class="brand-sub">体系化知识库 / 典型回答 / 追问点</div>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="search" title="演示原型：回车搜索（仅部分数据）">
+            <span class="muted mono">⌘K</span>
+            <input id="searchInput" placeholder="搜索知识点，例如：上下文切换 / HashMap / GC…" />
+          </div>
+          <span class="chip">默认：体系视图</span>
+          <button class="btn" onclick="window.open('../2026-04-23_后台管理_资料录入预览原型/admin.html', '_blank')">打开管理系统</button>
+          <button class="btn btn-primary" onclick="alert('原型：这里可进入“专项训练/刷题模式”')">开始练习</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="page"></div>
+
+    <script src="./assets/learning-center.js"></script>
+  </body>
+</html>
+

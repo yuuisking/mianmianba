@@ -1,0 +1,84 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions   InterviewSession[]
+  weaknesses Weakness[]
+  knowledgeDocuments KnowledgeDocument[]
+}
+
+model InterviewSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String   @default("ongoing") // e.g., "ongoing", "completed"
+  score     Int?
+  mode      String   @default("general") // e.g., "general", "technical", "behavioral"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+  report   Report?
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      String   // e.g., "user", "assistant", "system"
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  sessionId  String   @unique
+  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  highlights String
+  risks      String
+  nextSteps  String
+  dimensions String?  // Add dimensions field
+  evidence   String?  // Add evidence field
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Weakness {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dimension   String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model KnowledgeDocument {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  sourceType String
+  sourceUrl  String?
+  size       Int
+  status     String   @default("ready")
+  arkDocId   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
