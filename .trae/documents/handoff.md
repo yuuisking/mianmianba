@@ -9,9 +9,18 @@
 - 产品文档：`AI模拟面试平台_PRD.md`
 - UI 原型：`UI/`
 
+## 当前部署状态（2026-05-03）
+- GitHub 仓库：`https://github.com/yuuisking/mianmianba.git`
+- ECS 公网入口：`http://47.95.233.109`
+- 应用目录：`/srv/resumer`
+- 应用服务：`systemctl status resumer`
+- 反向代理：`systemctl status nginx`
+- 数据库：PostgreSQL（本机 127.0.0.1:5432，数据库名 `resumer_prod`，业务用户 `resumer`）
+
 ## 运行态数据（需要一起同步，否则“上下文”会断）
 - 学习中心知识库：`data/learning-center.json`
-- 本地 SQLite 数据库：`prisma/dev.db`
+- PostgreSQL 业务数据：`resumer_prod`（已替代服务器上的 SQLite 运行态）
+- SQLite 备份：服务器保留 `prisma/dev.db` 与 `prisma/dev.db.bak_*`，用于回滚与核对
 - 环境变量：`.env.local`（默认被 `.gitignore` 忽略，不建议进 Git）
 
 ## 两台电脑的推荐同步方式
@@ -23,7 +32,14 @@
 每次换电脑前后，手动拷贝并覆盖：
 - `.env.local`
 - `data/learning-center.json`
-- `prisma/dev.db`
+
+### 3) 服务器运行态（当前线上）
+- 业务主库已经切到 PostgreSQL，不再依赖线上 SQLite 作为主运行库
+- 如需核对迁移结果，可对比：
+  - SQLite：`/srv/resumer/prisma/dev.db`
+  - PostgreSQL：`resumer_prod`
+- 迁移脚本：`scripts/migrate_sqlite_to_postgres.py`
+- Prisma 初始化迁移：`prisma/migrations/20260503_init_postgresql/migration.sql`
 
 ## 常用入口
 - 登录页：`/login`
@@ -40,7 +56,7 @@
 
 ## 环境变量（示例）
 说明：不要把真实值写进仓库；两台电脑保持一致即可。
-- `DATABASE_URL`（SQLite/Prisma）
+- `DATABASE_URL`（当前生产为 PostgreSQL）
 - `NEXTAUTH_SECRET`
 - `DEEPSEEK_API_KEY`
-
+- `CRON_SECRET`
