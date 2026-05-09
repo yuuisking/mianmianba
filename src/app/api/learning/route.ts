@@ -1,14 +1,22 @@
-import { NextResponse } from 'next/server';
-import { learningDb } from '@/lib/db/learningDb';
+import { NextResponse } from "next/server";
+import { listPublicTopicBankCards } from "@/lib/learning/topicBankService";
+import { getPublishedDocumentOutline } from "@/lib/learning/documentService";
 
-export async function GET() {
-  const data = learningDb.getLearningData();
-  
-  // No mock data injection anymore. Real CMS data only.
-  
+/**
+ * 聚合学习中心公开数据，供需要整库快照的页面或脚本使用。
+ * @returns {Promise<Response>} Prisma 驱动的学习中心快照。
+ */
+export async function GET(): Promise<Response> {
+  const banks = await listPublicTopicBankCards();
+  const outlines = await Promise.all(
+    banks.map(async (bank) => ({
+      bankId: bank.id,
+      outline: await getPublishedDocumentOutline(bank.id),
+    }))
+  );
+
   return NextResponse.json({
-    kbs: data.kbs,
-    trees: data.trees,
-    contents: data.contents
+    banks,
+    outlines,
   });
 }

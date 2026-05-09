@@ -1,0 +1,96 @@
+<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="720" fill="#faf9f5"/>
+
+  <text x="80" y="96" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="36" font-weight="700">
+    面面吧 Logo Concept A
+  </text>
+  <text x="80" y="132" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    关键词：面对面、对话感、面试官与候选人、简洁、容易记住
+  </text>
+
+  <rect x="64" y="180" width="1072" height="232" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="96" y="226" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    Horizontal Lockup
+  </text>
+
+  <g transform="translate(96 264)">
+    <rect x="0" y="0" width="112" height="112" rx="30" fill="#141413"/>
+    <circle cx="38" cy="40" r="11" fill="#faf9f5"/>
+    <rect x="24" y="56" width="30" height="24" rx="12" fill="#faf9f5"/>
+    <circle cx="74" cy="40" r="11" fill="#faf9f5"/>
+    <rect x="60" y="56" width="30" height="24" rx="12" fill="#faf9f5"/>
+    <rect x="51" y="34" width="10" height="48" rx="5" fill="#d97757"/>
+    <circle cx="56" cy="24" r="8" fill="#d97757"/>
+  </g>
+
+  <g transform="translate(250 273)">
+    <text x="0" y="56" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="64" font-weight="700" letter-spacing="-1">
+      面面吧
+    </text>
+    <text x="4" y="102" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+      AI Mock Interview Platform
+    </text>
+    <rect x="0" y="124" width="212" height="8" rx="4" fill="#e8e6dc"/>
+    <rect x="0" y="124" width="92" height="8" rx="4" fill="#d97757"/>
+  </g>
+
+  <rect x="64" y="452" width="516" height="212" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="96" y="498" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    App Icon / Favicon
+  </text>
+
+  <g transform="translate(112 532)">
+    <rect x="0" y="0" width="88" height="88" rx="24" fill="#141413"/>
+    <circle cx="30" cy="32" r="9" fill="#faf9f5"/>
+    <rect x="18" y="46" width="24" height="20" rx="10" fill="#faf9f5"/>
+    <circle cx="58" cy="32" r="9" fill="#faf9f5"/>
+    <rect x="46" y="46" width="24" height="20" rx="10" fill="#faf9f5"/>
+    <rect x="39" y="28" width="10" height="40" rx="5" fill="#d97757"/>
+    <circle cx="44" cy="19" r="7" fill="#d97757"/>
+  </g>
+
+  <g transform="translate(238 544)">
+    <text x="0" y="18" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="28" font-weight="700">
+      图形语义
+    </text>
+    <text x="0" y="58" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+      两侧白色人物，代表面试官与候选人
+    </text>
+    <text x="0" y="94" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+      中间橙色竖形，代表话筒、问题焦点和对话主线
+    </text>
+    <text x="0" y="130" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+      深色底保证在导航、头像角标、小尺寸场景下依然清晰
+    </text>
+  </g>
+
+  <rect x="620" y="452" width="516" height="212" rx="32" fill="#141413"/>
+  <text x="652" y="498" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    Reverse Preview
+  </text>
+
+  <g transform="translate(668 520)">
+    <rect x="0" y="0" width="96" height="96" rx="26" fill="#faf9f5"/>
+    <circle cx="33" cy="35" r="10" fill="#141413"/>
+    <rect x="20" y="49" width="26" height="21" rx="10.5" fill="#141413"/>
+    <circle cx="63" cy="35" r="10" fill="#141413"/>
+    <rect x="50" y="49" width="26" height="21" rx="10.5" fill="#141413"/>
+    <rect x="43" y="30" width="10" height="42" rx="5" fill="#d97757"/>
+    <circle cx="48" cy="21" r="7.5" fill="#d97757"/>
+  </g>
+
+  <g transform="translate(800 544)">
+    <text x="0" y="18" fill="#faf9f5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="28" font-weight="700">
+      适用场景
+    </text>
+    <text x="0" y="58" fill="#e8e6dc" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+      导航 Logo
+    </text>
+    <text x="0" y="94" fill="#e8e6dc" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+      浏览器标签图标
+    </text>
+    <text x="0" y="130" fill="#e8e6dc" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+      App 启动图 / 登录页品牌位
+    </text>
+  </g>
+</svg>

@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
 import { learningDb } from "@/lib/db/learningDb";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { isAuthorizationFailure, requireAdminUser } from "@/lib/permissions";
 
 export async function DELETE(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    const isAdmin =
-      session?.user?.email?.toLowerCase().includes("admin") ||
-      session?.user?.name?.toLowerCase().includes("admin");
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
+    const authResult = await requireAdminUser();
+    if (isAuthorizationFailure(authResult)) {
+      return authResult.response;
     }
 
     const { searchParams } = new URL(req.url);

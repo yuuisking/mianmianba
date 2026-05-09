@@ -7,7 +7,83 @@ import type {
 } from "openai/resources/chat/completions/completions";
 import { searchKnowledgeBase } from "@/lib/knowledge/volc";
 import { getDeepseekClient } from "@/lib/ai/deepseek";
+import { buildInterviewSystemPrompt } from "@/lib/interview/prompt";
 
+/**
+ * 将面试消息内容归一化为单段纯文本，避免数组格式在多处重复处理。
+ * @param message 原始消息对象。
+ * @returns 可直接发送给模型的文本内容。
+ */
+function flattenMessageContent(message: {
+  content: string[] | string;
+}): string {
+  return Array.isArray(message.content) ? message.content.join("\n") : message.content;
+}
+
+type StreamedDeltaChunk = {
+  choices?: Array<{
+    delta?: {
+      content?: string | null;
+    };
+  }>;
+};
+
+/**
+ * 将系统提示词与历史消息统一拼成可直接发送给模型的消息数组。
+ * @param systemPrompt 当前轮次最终生效的系统提示词。
+ * @param messages 当前房间历史消息。
+ * @returns 发送给模型的完整消息数组。
+ */
+function buildApiMessages(
+  systemPrompt: string,
+  messages: Array<{ role: string; content: string[] | string }>
+): ChatCompletionMessageParam[] {
+  const apiMessages: ChatCompletionMessageParam[] = [
+    { role: "system", content: systemPrompt }
+  ];
+
+  for (const msg of messages) {
+    const contentStr = flattenMessageContent(msg);
+    apiMessages.push({
+      role: msg.role === "ai" ? "assistant" : "user",
+      content: contentStr
+    });
+  }
+
+  return apiMessages;
+}
+
+/**
+ * 将大模型返回的 token 增量转发给前端，确保文字面试与专项训练都是真正流式输出。
+ * @param apiMessages 发送给模型的消息数组。
+ * @param controller 当前响应流控制器。
+ * @param encoder 文本编码器。
+ */
+async function pipeInterviewReplyStream(
+  apiMessages: ChatCompletionMessageParam[],
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  encoder: TextEncoder
+): Promise<void> {
+  const openai = getDeepseekClient();
+  const stream = await openai.chat.completions.create({
+    model: "deepseek-chat",
+    messages: apiMessages,
+    stream: true
+  });
+
+  for await (const chunk of stream as AsyncIterable<StreamedDeltaChunk>) {
+    const deltaText = chunk.choices?.[0]?.delta?.content;
+    if (typeof deltaText === "string" && deltaText) {
+      controller.enqueue(encoder.encode(deltaText));
+    }
+  }
+}
+
+/**
+ * 处理面试房间聊天请求，并基于用户已确认的真实画像构造面试上下文。
+ * @param request 当前聊天接口请求。
+ * @returns 面试官流式回复，或明确的错误信息。
+ */
 export async function POST(request: Request) {
   try {
     const openai = getDeepseekClient();
@@ -17,7 +93,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { messages, profile, mode, topic, desc } = body; 
+    const {
+      messages,
+      profile,
+      mode,
+      topic,
+      desc,
+      questionLimit,
+      durationLimitMinutes,
+      completedRounds
+    } = body;
 
     // Check for new session daily limit
     const cookieStore = await cookies();
@@ -47,39 +132,26 @@ export async function POST(request: Request) {
       }
     }
 
-    let systemPrompt = "";
-    const domainContext = mode === "targeted" ? topic : (profile?.role || '人工智能与软件开发');
-    
-    if (mode === "targeted") {
-      systemPrompt = `你是一个高级面试辅导官。候选人目前正在进行专项训练，主题是【${topic}】，其薄弱点/训练目标为：【${desc}】。作为导师与面试官，你需要针对这个知识点进行深度、专业的追问或解答，每次只关注一个核心问题，帮助其巩固和提高。不需要要求候选人做自我介绍，直奔主题。`;
-    } else {
-      systemPrompt = `你是一个专业的${profile?.role || '开发'}面试官与资深导师，正在与候选人交流。`;
-      if (profile) {
-         systemPrompt += `候选人的简历信息：目标职位【${profile.targetLevel || '开发工程师'}】，面试重点【${profile.focus || '综合面试'}】。`;
-      }
-      systemPrompt += "请根据候选人的回答进行专业的点评、解答或追问。回答要专业、简练，像真实的面试或指导对话。";
-    }
-
-    // 增加严格的 Persona 限制，赋予面试官+导师的双重身份，以及领域上下文
-    systemPrompt += `\n【核心身份与交互原则】：
-1. **你的身份**：你既是一位高标准、专业的面试官，也是一位渊博的资深导师。绝对不能暴露你是一个 AI 或使用了外部工具/知识库。你当前的专业领域和语境是：【${domainContext}】。
-2. **术语消歧义规则（重要）**：当候选人提到英文缩写（如 MCP、SKILL、RAG 等）或可能存在歧义的词汇时，你**必须优先**基于当前的专业领域（特别是 AI Agent 开发、大模型、软件工程等领域）进行解释。例如，在 AI 领域，MCP 通常指 Model Context Protocol，而 Skill 通常指大模型的技能/插件。如果某个缩写在当前领域极为罕见或存在极大歧义，请以导师口吻主动向候选人确认（例如：“你提到的 MCP 是指 Model Context Protocol，还是其他领域的概念？”），绝对不要自信地跨行业瞎掰（比如解释成芯片设计的 EDA 工具）。
-3. **导师模式**：当候选人说出短词汇（如“mcp skill”）、明确表示不懂、或者主动向你求教时，你必须切换到导师模式。基于你的知识储备或参考资料，给出专业、清晰的科普和解答。解答后，可以自然地引导回面试场景（例如：“你理解了吗？那么如果在你的项目中遇到类似问题，你会怎么处理？”），切忌像个无情的提问机器一样死板反问。
-4. **面试官模式**：当候选人在认真回答面试问题时，你需进行专业的点评与深挖追问。
-5. **禁止行为**：
-   - 绝对不能在回答中说出类似“根据知识库”、“既然知识库中没有现成资料”、“我搜索了资料”、“构建学习框架”等暴露你内部状态的话语。
-   - 绝对不能捏造或者输出类似 \`skill\`、\`desc\` 等系统占位符。
-   - 永远保持自然对话，直接对候选人说话。`;
+    const resolvedRole =
+      typeof profile?.role === "string" && profile.role.trim()
+        ? profile.role.trim()
+        : "";
+    const domainContext =
+      mode === "targeted"
+        ? topic || desc || resolvedRole || "专项训练上下文"
+        : resolvedRole || "候选人真实简历上下文";
 
     const latestMessageObj = messages[messages.length - 1];
-    const latestMessageContent = latestMessageObj 
-      ? (Array.isArray(latestMessageObj.content) ? latestMessageObj.content.join('\n') : latestMessageObj.content)
+    const latestMessageContent = latestMessageObj
+      ? flattenMessageContent(latestMessageObj)
       : "";
 
     const stream = new ReadableStream({
       async start(controller) {
         try {
           const encoder = new TextEncoder();
+          let systemPrompt = "";
+          let searchResults: Array<{ text?: string }> = [];
           
           // Before starting the final LLM stream, let's run the intent router.
           let routerResult = { needs_search: false };
@@ -105,46 +177,48 @@ export async function POST(request: Request) {
                 // 向前端发送控制指令：开始检索
                 controller.enqueue(encoder.encode('__STATUS_SEARCHING__'));
                 
-                const searchResults = await searchKnowledgeBase(latestMessageContent);
-                if (searchResults && searchResults.length > 0) {
-                  systemPrompt += `\n\n【参考资料（仅供你作为面试官提问或判断时参考，绝对不要告诉候选人这是你检索到的）】：\n${searchResults.map((r: any) => r.text).join('\n')}`;
-                }
+                searchResults = await searchKnowledgeBase(latestMessageContent);
+                const promptPayload = buildInterviewSystemPrompt({
+                  messages,
+                  profile,
+                  mode,
+                  topic,
+                  desc,
+                  questionLimit,
+                  durationLimitMinutes,
+                  completedRounds,
+                  searchResults
+                });
+                systemPrompt = promptPayload.systemPrompt;
               }
             } catch (err) {
               console.error("Intent Router or Knowledge Base search failed:", err);
             }
           }
 
-          // Now construct the final messages with updated systemPrompt
-          const apiMessages: ChatCompletionMessageParam[] = [
-            { role: "system", content: systemPrompt }
-          ];
-
-          for (const msg of messages) {
-            const contentStr = Array.isArray(msg.content) ? msg.content.join('\n') : msg.content;
-            if (msg.role === 'ai') {
-              apiMessages.push({ role: 'assistant', content: contentStr });
-            } else {
-              apiMessages.push({ role: 'user', content: contentStr });
-            }
+          if (!systemPrompt) {
+            const promptPayload = buildInterviewSystemPrompt({
+              messages,
+              profile,
+              mode,
+              topic,
+              desc,
+              questionLimit,
+              durationLimitMinutes,
+              completedRounds,
+              searchResults: []
+            });
+            systemPrompt = promptPayload.systemPrompt;
           }
+
+          const apiMessages = buildApiMessages(
+            systemPrompt,
+            messages as Array<{ role: string; content: string[] | string }>
+          );
 
           // 向前端发送控制指令：检索完毕，准备生成回答
           controller.enqueue(encoder.encode('__STATUS_GENERATING__'));
-
-          // Call with streaming for the final answer
-          const streamCompletion = await openai.chat.completions.create({
-            model: 'deepseek-chat',
-            messages: apiMessages,
-            stream: true,
-          });
-
-          for await (const chunk of streamCompletion) {
-            const content = chunk.choices[0]?.delta?.content || '';
-            if (content) {
-              controller.enqueue(encoder.encode(content));
-            }
-          }
+          await pipeInterviewReplyStream(apiMessages, controller, encoder);
         } catch (err) {
           controller.error(err);
         } finally {

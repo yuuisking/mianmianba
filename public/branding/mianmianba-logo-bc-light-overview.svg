@@ -1,0 +1,58 @@
+<svg width="1400" height="760" viewBox="0 0 1400 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1400" height="760" fill="#faf9f5"/>
+
+  <text x="64" y="84" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="40" font-weight="700">
+    面面吧 · B / C 浅底版对比
+  </text>
+  <text x="64" y="120" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    去掉黑底之后，比较“中文品牌感”和“科技产品感”两条路线
+  </text>
+
+  <rect x="56" y="168" width="612" height="536" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="96" y="220" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="30" font-weight="700">
+    B · 中文印章浅底版
+  </text>
+  <g transform="translate(110 290)">
+    <rect x="0" y="0" width="136" height="136" rx="34" fill="#fffdf8" stroke="#141413" stroke-width="8"/>
+    <rect x="28" y="26" width="80" height="80" rx="18" stroke="#141413" stroke-width="10"/>
+    <rect x="44" y="42" width="48" height="48" rx="10" stroke="#d97757" stroke-width="8"/>
+    <path d="M18 116H118" stroke="#788c5d" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="116" cy="116" r="10" fill="#6a9bcc"/>
+  </g>
+  <text x="284" y="372" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="60" font-weight="700">
+    面面吧
+  </text>
+  <text x="96" y="504" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+    更像品牌标识，更耐久
+  </text>
+  <text x="96" y="546" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+    中文感强，原创性强
+  </text>
+  <text x="96" y="588" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+    如果你想做“面面吧”自己的品牌，我更推荐这条
+  </text>
+
+  <rect x="732" y="168" width="612" height="536" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="772" y="220" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="30" font-weight="700">
+    C · 科技字母浅底版
+  </text>
+  <g transform="translate(786 290)">
+    <rect x="0" y="0" width="136" height="136" rx="34" fill="#fffdf8" stroke="#141413" stroke-width="8"/>
+    <path d="M30 92V42C30 34.268 36.268 28 44 28H52C56.784 28 61.248 30.442 63.84 34.484L68 40.968L72.16 34.484C74.752 30.442 79.216 28 84 28H92C99.732 28 106 34.268 106 42V92" stroke="#141413" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M38 84H98" stroke="#6a9bcc" stroke-width="8" stroke-linecap="round"/>
+    <path d="M34 102L48 90" stroke="#d97757" stroke-width="8" stroke-linecap="round"/>
+    <path d="M102 102L88 90" stroke="#788c5d" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <text x="960" y="372" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="60" font-weight="700">
+    面面吧
+  </text>
+  <text x="772" y="504" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+    更像 AI 产品，更现代
+  </text>
+  <text x="772" y="546" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+    浅色界面里会更轻、更清爽
+  </text>
+  <text x="772" y="588" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+    如果你想做“更像 AI 平台”，我更推荐这条
+  </text>
+</svg>

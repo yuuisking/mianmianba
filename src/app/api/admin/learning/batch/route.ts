@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { summarizeDocument } from "@/lib/ai/summarizer";
 import { routeContent } from "@/lib/ai/router";
 import { learningDb } from "@/lib/db/learningDb";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { learningFactory } from "@/lib/db/learningFactory";
+import { isAuthorizationFailure, requireAdminUser } from "@/lib/permissions";
 
 // GitHub 树状结构 API 返回项的类型
 type GitHubTreeItem = {
@@ -15,15 +15,16 @@ type GitHubTreeItem = {
   url: string;
 };
 
+/**
+ * Imports a GitHub directory as a set of traced source records and reviewable drafts.
+ * @param {Request} req Incoming route request.
+ * @returns {Promise<Response>} NDJSON stream describing the batch progress.
+ */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    const isAdmin =
-      session?.user?.email?.toLowerCase().includes("admin") ||
-      session?.user?.name?.toLowerCase().includes("admin");
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
+    const authResult = await requireAdminUser();
+    if (isAuthorizationFailure(authResult)) {
+      return authResult.response;
     }
 
     const body = (await req.json().catch(() => ({}))) as {
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
 
     // 3. 确保知识库存在
     const dbData = learningDb.getLearningData();
-    let kb = dbData.kbs.find(k => k.id === kbId);
+    const kb = dbData.kbs.find(k => k.id === kbId);
     if (!kb) {
       learningDb.createKb({
         id: kbId,
@@ -100,10 +101,9 @@ export async function POST(req: Request) {
         sendMsg(`📄 找到 ${files.length} 个 Markdown 文件。${limit > 0 ? `(限制处理前 ${limit} 个)` : ''}`);
 
         let successCount = 0;
-        let failCount = 0;
-
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
+          let sourceId = "";
           const relativePath = file.path.substring(dirPath.length + 1);
           const parts = relativePath.split("/");
           
@@ -140,46 +140,64 @@ export async function POST(req: Request) {
             
             sendMsg(`   🔀 路由结果: 分类=[${subjectName}], 主题=[${topicName}]`);
             
-            let topicId = "";
-            // 查找是否已存在同名 topic
-            if (currentDbData.contents[kbId]) {
-              for (const [id, content] of Object.entries(currentDbData.contents[kbId])) {
-                if (content.title === topicName) {
-                  topicId = id;
-                  break;
-                }
-              }
-            }
-            
-            if (!topicId) {
-              // 如果没有找到同名 topic，则生成一个安全的 ID
-              const safeTopic = encodeURIComponent(topicName.trim()).toLowerCase().replace(/%/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-              topicId = safeTopic || Date.now().toString();
-            }
-            
             let existingContentStr: string | undefined = undefined;
-            const existingContentObj = currentDbData.contents[kbId]?.[topicId];
+            const existingContentObj = Object.values(currentDbData.contents[kbId] || {}).find(
+              (content) => content.title === topicName
+            );
             if (existingContentObj) {
               existingContentStr = JSON.stringify(existingContentObj, null, 2);
               sendMsg(`   🔄 发现已有内容，将进行知识融合...`);
             }
 
+            const sourceRegistration = learningFactory.registerSource({
+              kbId,
+              type: "github_markdown",
+              mode: "batch",
+              title: `${subjectName} / ${fileName}`,
+              url: rawUrl,
+              subject: subjectName,
+              whitelist: true,
+              excerpt: markdown.slice(0, 800),
+            });
+            sourceId = sourceRegistration.source.id;
+            learningFactory.updateSource(sourceRegistration.source.id, {
+              status: "ingesting",
+              error: null,
+            });
+
             sendMsg(`   🧠 正在调用 AI 归纳引擎...`);
             const summary = await summarizeDocument(markdown, existingContentStr);
 
             learningDb.ensureSubject(kbId, subjectName);
-            learningDb.addContent(kbId, subjectName, topicId, {
-              title: summary.topic || topicName,
-              breadcrumb: [kbId, subjectName],
-              quickFacts: summary.content?.quickFacts || [],
-              sections: summary.content?.sections || []
+            const draft = learningFactory.createDraft({
+              kbId,
+              subject: subjectName,
+              summary: {
+                ...summary,
+                topic: summary.topic || topicName,
+              },
+              sourceIds: [sourceRegistration.source.id],
+              diffSummary: [
+                "批量采集资料已进入待审核队列。",
+                "已完成路由与归纳，待管理员统一审核后发布。",
+              ],
             });
-
-            sendMsg(`   ✅ 成功入库！提取主题: ${summary.topic}`);
+            learningFactory.updateSource(sourceRegistration.source.id, {
+              status: "drafted",
+              subject: subjectName,
+              draftId: draft.id,
+            });
+            sendMsg(`   ✅ 已生成草稿：${draft.id}，主题：${summary.topic || topicName}`);
             successCount++;
-          } catch (err: any) {
-            sendMsg(`   ❌ 处理失败: ${err.message}`);
-            failCount++;
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Unknown error";
+            if (sourceId) {
+              learningFactory.updateSource(sourceId, {
+                status: "failed",
+                error: message,
+              });
+            }
+            sendMsg(`   ❌ 处理失败: ${message}`);
           }
           
           // 防止 API 限流

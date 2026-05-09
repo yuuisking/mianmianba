@@ -1,10 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { synthesizeSpeech } from '@/lib/speech/volc';
+import { resolveQwenOutputEncoding, synthesizeSpeech } from '@/lib/speech/qwen';
+
+/**
+ * 统一提取异常消息，避免直接依赖不安全的 `any` 类型。
+ * @param error 任意异常对象。
+ * @returns 可返回给前端的错误消息。
+ */
+function resolveErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : '语音合成处理失败';
+}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { text, voiceType, speedRatio, encoding = 'mp3' } = body;
+    const {
+      text,
+      voiceType,
+      speedRatio,
+      pitchRatio,
+      volumeRatio,
+      encoding = 'wav'
+    } = body;
 
     if (!text) {
       return NextResponse.json(
@@ -13,13 +29,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const normalizedEncoding = resolveQwenOutputEncoding(encoding);
     const audioBuffer = await synthesizeSpeech(text, {
       voiceType,
       speedRatio,
-      encoding,
+      pitchRatio,
+      volumeRatio,
+      encoding: normalizedEncoding,
     });
 
-    const contentType = encoding === 'wav' ? 'audio/wav' : 'audio/mpeg';
+    const contentType = normalizedEncoding === 'wav' ? 'audio/wav' : 'application/octet-stream';
 
     return new NextResponse(audioBuffer as unknown as BodyInit, {
       status: 200,
@@ -28,10 +47,10 @@ export async function POST(req: NextRequest) {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('TTS Error:', error);
     return NextResponse.json(
-      { error: error.message || '语音合成处理失败' },
+      { error: resolveErrorMessage(error) },
       { status: 500 }
     );
   }

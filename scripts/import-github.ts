@@ -9,6 +9,15 @@ import { learningDb } from "../src/lib/db/learningDb";
 import { summarizeDocument } from "../src/lib/ai/summarizer";
 import { routeContent } from "../src/lib/ai/router";
 
+type GitHubTreeEntry = {
+  path: string;
+  type: string;
+};
+
+type GitHubTreeResponse = {
+  tree?: GitHubTreeEntry[];
+};
+
 async function main() {
   const args = process.argv.slice(2);
   
@@ -40,8 +49,8 @@ async function main() {
     process.exit(1);
   }
 
-  const data = await res.json();
-  let files = data.tree.filter((item: any) => 
+  const data = (await res.json()) as GitHubTreeResponse;
+  let files = (data.tree ?? []).filter((item) =>
     item.type === "blob" && 
     item.path.startsWith(dirPath + "/") && 
     item.path.endsWith(".md")
@@ -56,7 +65,7 @@ async function main() {
 
   // 3. 确保知识库存在
   const dbData = learningDb.getLearningData();
-  let kb = dbData.kbs.find(k => k.id === kbId);
+  const kb = dbData.kbs.find((item) => item.id === kbId);
   if (!kb) {
     learningDb.createKb({
       id: kbId,
@@ -64,7 +73,7 @@ async function main() {
       subtitle: "自动导入的体系化知识库",
       tags: ["GitHub导入", "自动生成"],
       updatedAt: new Date().toISOString().split("T")[0],
-      stats: { topics: 0, paths: 0 }
+      stats: { topics: 0, paths: 0 },
     });
   }
 
@@ -150,12 +159,13 @@ async function main() {
       });
 
       console.log(`   ✅ 成功入库！提取主题: ${summary.topic}`);
-    } catch (err: any) {
-      console.error(`   ❌ 处理失败: ${err.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error(`   ❌ 处理失败: ${message}`);
     }
     
     // 适当延时，防止 DeepSeek API 限流
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
   console.log(`\n🎉 全部 ${files.length} 个文件处理完成！请返回网页刷新学习中心查看最新生成的体系树。`);

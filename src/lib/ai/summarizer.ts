@@ -1,6 +1,59 @@
 import { getDeepseekClient } from "./deepseek";
+import type { DraftSummary } from "@/lib/db/learningDb";
+import { evaluateRawSummaryText } from "@/lib/learning/documentSummary";
 
-export async function summarizeDocument(text: string, existingContent?: string) {
+/**
+ * 基于知识工厂需要的严格结构校验总结结果，缺字段时直接失败而不是补默认内容。
+ * @param {unknown} value 模型返回的原始 JSON 数据。
+ * @returns {DraftSummary} 通过结构校验的总结对象。
+ */
+function validateFactorySummaryResult(value: unknown): DraftSummary {
+  if (!value || typeof value !== "object") {
+    throw new Error("AI 总结结果格式无效。");
+  }
+
+  const summary = value as {
+    topic?: unknown;
+    content?: {
+      quickFacts?: unknown;
+      sections?: unknown;
+    };
+  };
+
+  const topic = typeof summary.topic === "string" ? summary.topic.trim() : "";
+  const quickFacts = Array.isArray(summary.content?.quickFacts)
+    ? summary.content?.quickFacts.filter((item) => item && typeof item === "object")
+    : [];
+  const sections = Array.isArray(summary.content?.sections)
+    ? summary.content?.sections.filter((item) => item && typeof item === "object")
+    : [];
+
+  if (!topic || quickFacts.length === 0 || sections.length < 2) {
+    throw new Error("AI 总结结果缺少必要内容，请稍后重试。");
+  }
+
+  return summary as DraftSummary;
+}
+
+/**
+ * 在真正请求模型前校验正文是否足够，避免仅靠标题或极少文本编造知识内容。
+ * @param {string} text 待总结的原始文本。
+ * @returns {void} 正文不足时直接抛出错误。
+ */
+function assertSummarySourceIsSufficient(text: string): void {
+  const sufficiency = evaluateRawSummaryText(text);
+  if (!sufficiency.isSufficient) {
+    throw new Error(sufficiency.message);
+  }
+}
+
+/**
+ * 生成学习中心知识工厂使用的结构化总结结果。
+ * @param {string} text 原始文本或 URL。
+ * @param {string} [existingContent] 已有内容，存在时用于知识融合。
+ * @returns {Promise<DraftSummary>} 知识工厂所需的结构化总结结果。
+ */
+export async function summarizeDocument(text: string, existingContent?: string): Promise<DraftSummary> {
   const openai = getDeepseekClient();
   let rawText = text;
 
@@ -24,6 +77,8 @@ export async function summarizeDocument(text: string, existingContent?: string) 
       throw new Error('Failed to fetch and extract text from URL');
     }
   }
+
+  assertSummarySourceIsSufficient(rawText);
 
 const mergeInstructions = existingContent 
     ? `
@@ -92,10 +147,13 @@ Respond ONLY with the JSON. Do not wrap the JSON in markdown blocks (e.g. do not
     throw new Error('Failed to generate summary');
   }
 
+  let parsed: unknown;
   try {
-    return JSON.parse(content);
+    parsed = JSON.parse(content);
   } catch (error: unknown) {
     console.error('Failed to parse JSON:', content, error);
     throw new Error('Failed to parse summary JSON');
   }
+
+  return validateFactorySummaryResult(parsed);
 }

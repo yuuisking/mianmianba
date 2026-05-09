@@ -19,17 +19,15 @@ export async function GET(req: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    const whereClause: any = { userId };
+    const whereClause: { userId: string; mode?: { contains: string } } = { userId };
     
     if (search) {
-      if ("视频面试".includes(search)) {
-        whereClause.mode = { contains: "video" };
+      if ("实时面试".includes(search) || "语音面试".includes(search) || "视频面试".includes(search)) {
+        whereClause.mode = { contains: "realtime" };
       } else if ("文字面试".includes(search)) {
         whereClause.mode = { contains: "text" };
-      } else if ("语音面试".includes(search)) {
-        whereClause.mode = { contains: "voice" };
-      } else if ("综合面试".includes(search)) {
-        whereClause.mode = { contains: "general" };
+      } else if ("专项训练".includes(search)) {
+        whereClause.mode = { contains: "targeted" };
       } else {
         whereClause.mode = { contains: search };
       }

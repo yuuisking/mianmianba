@@ -1,26 +1,19 @@
 import { NextResponse } from "next/server";
 import { learningDb } from "@/lib/db/learningDb";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { learningFactory } from "@/lib/db/learningFactory";
+import { alignDraftToFormalTemplate, inspectDraftQuality } from "@/lib/learning/documentTemplate";
+import { isAuthorizationFailure, requireAdminUser } from "@/lib/permissions";
 
-function makeTopicId(topic: string) {
-  const encoded = encodeURIComponent(topic.trim()).toLowerCase();
-  const safe = encoded
-    .replace(/%/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-  return safe || Date.now().toString();
-}
-
+/**
+ * Publishes one reviewed draft into the public learning center and records release history.
+ * @param {Request} req Incoming route request.
+ * @returns {Promise<Response>} Publish result payload.
+ */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    const isAdmin =
-      session?.user?.email?.toLowerCase().includes("admin") ||
-      session?.user?.name?.toLowerCase().includes("admin");
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
+    const authResult = await requireAdminUser();
+    if (isAuthorizationFailure(authResult)) {
+      return authResult.response;
     }
 
     const body = (await req.json().catch(() => ({}))) as {
@@ -40,22 +33,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Draft not found" }, { status: 404 });
     }
 
-    const title = draft.summary?.topic?.trim() || "未命名主题";
-    const topicId = makeTopicId(title);
+    const qualityCheck = inspectDraftQuality(alignDraftToFormalTemplate(draft.summary));
+    if (!qualityCheck.publishReady) {
+      return NextResponse.json(
+        {
+          error: `发布前校验未通过：${qualityCheck.blockingIssues.join("；")}`,
+          qualityCheck,
+        },
+        { status: 400 }
+      );
+    }
 
-    learningDb.addContent(kbId, draft.subject || "默认分类", topicId, {
-      title,
-      breadcrumb: [kbId, draft.subject || "默认分类", title],
-      quickFacts: draft.summary?.content?.quickFacts || [],
-      sections: draft.summary?.content?.sections || [],
+    const publishResult = learningFactory.publishDraft(kbId, draftId);
+    if (!publishResult) {
+      return NextResponse.json({ error: "Draft not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      topicId: publishResult.topicId,
+      publishRecord: publishResult.publishRecord,
     });
-
-    learningDb.deleteDraft(kbId, draftId);
-
-    return NextResponse.json({ success: true, topicId });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
-

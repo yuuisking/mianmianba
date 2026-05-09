@@ -4,6 +4,16 @@ export interface KBSearchResult {
   source?: string;
 }
 
+type ArkSearchResultItem = {
+  content: string;
+  score: number;
+  title?: string;
+};
+
+type ArkSearchResponse = {
+  results?: ArkSearchResultItem[];
+};
+
 const VOLC_ARK_API_KEY = process.env.VOLC_ARK_API_KEY || "ark-5587ae01-6c7b-429b-b156-0772433da31a-16663";
 const KB_ID = process.env.VOLC_KB_ID || "kb-1fb8ecff642d926e";
 const ARK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
@@ -33,11 +43,11 @@ export async function searchKnowledgeBase(query: string): Promise<KBSearchResult
       return [];
     }
 
-    const data = await res.json();
-    return data.results?.map((r: any) => ({
-      text: r.content,
-      score: r.score,
-      source: r.title || "Ark KB"
+    const data = (await res.json()) as ArkSearchResponse;
+    return data.results?.map((result) => ({
+      text: result.content,
+      score: result.score,
+      source: result.title || "Ark KB",
     })) || [];
   } catch (error) {
     console.error("[KB Search] Network/Parse Error:", error);

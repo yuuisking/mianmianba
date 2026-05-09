@@ -26,11 +26,11 @@ export async function POST(req: NextRequest) {
     const result = await recognizeSpeech(buffer, format);
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('ASR Error:', error);
-    // return standard user-friendly error message from recognizeSpeech
+    const message = error instanceof Error ? error.message : '语音识别处理失败';
     return NextResponse.json(
-      { error: error.message || '语音识别处理失败' },
+      { error: message },
       { status: 500 }
     );
   }

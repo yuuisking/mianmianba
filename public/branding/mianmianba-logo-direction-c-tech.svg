@@ -1,0 +1,74 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="760" fill="#faf9f5"/>
+
+  <text x="72" y="88" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="38" font-weight="700">
+    Direction C · 科技字母版
+  </text>
+  <text x="72" y="124" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    以 M + 对话气泡组合，整体更像 AI 产品和互联网品牌
+  </text>
+
+  <rect x="56" y="172" width="1088" height="252" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="88" y="218" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    Horizontal Logo
+  </text>
+
+  <g transform="translate(88 252)">
+    <rect x="0" y="0" width="136" height="136" rx="34" fill="#141413"/>
+    <path d="M30 92V42C30 34.268 36.268 28 44 28H52C56.784 28 61.248 30.442 63.84 34.484L68 40.968L72.16 34.484C74.752 30.442 79.216 28 84 28H92C99.732 28 106 34.268 106 42V92" stroke="#faf9f5" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M38 84H98" stroke="#6a9bcc" stroke-width="8" stroke-linecap="round"/>
+    <path d="M34 102L48 90" stroke="#d97757" stroke-width="8" stroke-linecap="round"/>
+    <path d="M102 102L88 90" stroke="#788c5d" stroke-width="8" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(264 272)">
+    <text x="0" y="62" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="68" font-weight="700" letter-spacing="-1">
+      面面吧
+    </text>
+    <text x="4" y="110" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+      AI-native / Sharp / Digital
+    </text>
+    <rect x="0" y="130" width="260" height="8" rx="4" fill="#e8e6dc"/>
+    <rect x="0" y="130" width="84" height="8" rx="4" fill="#6a9bcc"/>
+  </g>
+
+  <rect x="56" y="456" width="344" height="236" rx="28" fill="#141413"/>
+  <text x="88" y="502" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    Dark UI
+  </text>
+  <g transform="translate(132 548)">
+    <rect x="0" y="0" width="100" height="100" rx="26" fill="#faf9f5"/>
+    <path d="M22 68V30C22 24.477 26.477 20 32 20H38C41.873 20 45.484 21.997 47.623 25.289L50 28.947L52.377 25.289C54.516 21.997 58.127 20 62 20H68C73.523 20 78 24.477 78 30V68" stroke="#141413" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M28 62H72" stroke="#6a9bcc" stroke-width="7" stroke-linecap="round"/>
+    <path d="M24 80L35 70" stroke="#d97757" stroke-width="7" stroke-linecap="round"/>
+    <path d="M76 80L65 70" stroke="#788c5d" stroke-width="7" stroke-linecap="round"/>
+  </g>
+
+  <rect x="428" y="456" width="344" height="236" rx="28" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="460" y="502" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="28" font-weight="700">
+    图形语义
+  </text>
+  <text x="460" y="552" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    主体是字母 M，也可理解为双气泡结构
+  </text>
+  <text x="460" y="590" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    蓝橙绿三色体现训练、反馈、成长
+  </text>
+  <text x="460" y="628" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    整体更适合偏 AI、SaaS、科技产品气质
+  </text>
+
+  <rect x="800" y="456" width="344" height="236" rx="28" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="832" y="502" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="28" font-weight="700">
+    特点
+  </text>
+  <text x="832" y="552" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    最现代、最互联网产品化
+  </text>
+  <text x="832" y="590" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    更适合 AI 面试平台的技术感表达
+  </text>
+  <text x="832" y="628" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    但中文品牌专属感会弱一些
+  </text>
+</svg>

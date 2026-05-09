@@ -3,54 +3,130 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import prisma from "@/lib/prisma";
 import { getDeepseekClient } from "@/lib/ai/deepseek";
+import { getInterviewModeLabel } from "@/lib/interview/config";
+
+type ReportHistoryMessage = {
+  role?: string;
+  content?: string | string[];
+};
+
+/**
+ * 判断当前历史是否已形成足够的有效问答，避免空面试也生成评分报告。
+ * @param history 前端传入的面试历史快照。
+ * @returns 是否存在至少一轮有效问答。
+ */
+function hasEffectiveInterviewContent(history: {
+  messages?: ReportHistoryMessage[];
+  questionCount?: number;
+} | null): boolean {
+  const messages = history?.messages || [];
+  const userMessages = messages.filter((message) => {
+    const content = Array.isArray(message.content)
+      ? message.content.join("\n")
+      : String(message.content || "");
+    return message.role === "user" && content.trim().length > 0;
+  });
+  const assistantMessages = messages.filter((message) => {
+    const content = Array.isArray(message.content)
+      ? message.content.join("\n")
+      : String(message.content || "");
+    return message.role === "ai" && content.trim().length > 0;
+  });
+
+  return userMessages.length >= 1 && assistantMessages.length >= 1;
+}
 
 export async function POST(request: Request) {
   try {
-    const openai = getDeepseekClient();
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();
-    const { history, profile } = body;
+    const { history, profile, sessionId } = body;
 
-    const questionCount = history?.questionCount || 5;
-    const mode = profile?.mode || "general";
-    const targetLevel = profile?.targetLevel || "未知层级";
-    const language = profile?.language || "中文";
-    const focus = profile?.focus || "综合面试";
+    const questionCount = Number.isFinite(history?.questionCount)
+      ? Number(history.questionCount)
+      : 0;
+    const mode = profile?.mode || "text";
+    const targetLevel = profile?.targetLevel?.trim() || "未提供";
+    const language = profile?.language?.trim() || "中文";
+    const focus = profile?.focus?.trim() || "未额外指定";
+    const role =
+      profile?.role?.trim() ||
+      getInterviewModeLabel(mode, Boolean(profile?.videoEnabled));
+
+    if (!hasEffectiveInterviewContent(history)) {
+      const existingSession = sessionId
+        ? await prisma.interviewSession.findFirst({
+            where: {
+              id: sessionId,
+              userId: session.user.id
+            }
+          })
+        : null;
+
+      if (existingSession) {
+        await prisma.interviewSession.update({
+          where: { id: existingSession.id },
+          data: {
+            status: "completed",
+            score: null,
+            mode
+          }
+        });
+      }
+
+      return NextResponse.json({
+        noEffectiveInterview: true,
+        score: null,
+        highlights: [],
+        risks: [],
+        evidence: [],
+        nextSteps: [],
+        dimensions: [],
+        metadata: {
+          role,
+          questions: questionCount
+        },
+        sessionId: existingSession?.id || sessionId || null
+      });
+    }
+
+    const openai = getDeepseekClient();
 
     const prompt = `
-Please act as an expert technical interviewer and provide an evaluation report based on the provided interview chat history.
+请你作为资深技术面试评估官，根据真实面试历史生成结构化评估报告。
 
-Context:
-- Target Level: ${targetLevel}
-- Language: ${language}
-- Focus: ${focus}
+上下文：
+- 目标岗位：${role}
+- 目标层级：${targetLevel}
+- 语言：${language}
+- 本次重点：${focus}
 
-Chat History Information:
+面试历史：
 ${JSON.stringify(history, null, 2)}
 
-You MUST return a strictly valid JSON object. Do not output any markdown formatting like \`\`\`json. Only output the raw JSON object matching this exact structure:
+你必须返回严格合法的 JSON 对象，不能输出 markdown 或额外说明。结构如下：
 {
-  "score": 85, // integer between 0 and 100
+  "score": 85,
   "highlights": [
-    "String highlight 1",
-    "String highlight 2"
+    "亮点 1",
+    "亮点 2"
   ],
   "risks": [
-    "String risk 1",
-    "String risk 2"
+    "风险 1",
+    "风险 2"
   ],
   "evidence": [
-    "System evidence 1",
-    "System evidence 2"
+    "判定证据 1",
+    "判定证据 2"
   ],
   "nextSteps": [
     {
-      "title": "Actionable step title",
-      "desc": "Description of the step"
+      "title": "可执行训练动作",
+      "desc": "动作说明"
     }
   ],
   "dimensions": [
@@ -61,7 +137,7 @@ You MUST return a strictly valid JSON object. Do not output any markdown formatt
     { "name": "JD 匹配度", "score": "8.5" }
   ],
   "metadata": {
-    "role": "前端开发工程师", // Or infer from context
+    "role": "${role}",
     "questions": ${questionCount}
   }
 }
@@ -70,7 +146,7 @@ You MUST return a strictly valid JSON object. Do not output any markdown formatt
     const completion = await openai.chat.completions.create({
       model: "deepseek-chat",
       messages: [
-        { role: "system", content: "You are an expert technical interviewer evaluator. Output JSON only." },
+        { role: "system", content: "你是一位资深技术面试评估官，只输出 JSON。" },
         { role: "user", content: prompt }
       ],
       response_format: { type: "json_object" }
@@ -81,29 +157,60 @@ You MUST return a strictly valid JSON object. Do not output any markdown formatt
 
     // Save to database
     try {
-      const dbSession = await prisma.interviewSession.create({
-        data: {
-          userId: session.user.id,
-          status: "completed",
-          score: report.score || 0,
-          mode: mode,
-          messages: {
-            create: (history?.messages || []).map((msg: { role: string, content: string | string[] }) => ({
-              role: msg.role === "ai" ? "assistant" : "user",
-              content: Array.isArray(msg.content) ? msg.content.join("\n") : String(msg.content)
-            }))
-          },
-          report: {
-            create: {
-              highlights: JSON.stringify(report.highlights || []),
-              risks: JSON.stringify(report.risks || []),
-              nextSteps: JSON.stringify(report.nextSteps || []),
-              dimensions: JSON.stringify(report.dimensions || []),
-              evidence: JSON.stringify(report.evidence || [])
+      const reportPayload = {
+        highlights: JSON.stringify(report.highlights || []),
+        risks: JSON.stringify(report.risks || []),
+        nextSteps: JSON.stringify(report.nextSteps || []),
+        dimensions: JSON.stringify(report.dimensions || []),
+        evidence: JSON.stringify(report.evidence || [])
+      };
+
+      const existingSession = sessionId
+        ? await prisma.interviewSession.findFirst({
+            where: {
+              id: sessionId,
+              userId: session.user.id
             }
-          }
-        }
-      });
+          })
+        : null;
+
+      const dbSession = existingSession
+        ? await prisma.interviewSession.update({
+            where: { id: existingSession.id },
+            data: {
+              status: "completed",
+              score: report.score ?? null,
+              mode,
+              report: {
+                upsert: {
+                  create: reportPayload,
+                  update: reportPayload
+                }
+              }
+            }
+          })
+        : await prisma.interviewSession.create({
+            data: {
+              userId: session.user.id,
+              status: "completed",
+              score: report.score ?? null,
+              mode,
+              messages: {
+                create: (history?.messages || []).map((msg: {
+                  role: string;
+                  content: string | string[];
+                }) => ({
+                  role: msg.role === "ai" ? "assistant" : "user",
+                  content: Array.isArray(msg.content)
+                    ? msg.content.join("\n")
+                    : String(msg.content)
+                }))
+              },
+              report: {
+                create: reportPayload
+              }
+            }
+          });
       
       return NextResponse.json({ ...report, sessionId: dbSession.id });
     } catch (dbError) {

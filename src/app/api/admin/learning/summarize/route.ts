@@ -1,20 +1,18 @@
 import { NextResponse } from 'next/server';
 import { summarizeDocument } from '@/lib/ai/summarizer';
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { evaluateRawSummaryText } from "@/lib/learning/documentSummary";
+import { isAuthorizationFailure, requireAdminUser } from "@/lib/permissions";
 
+/**
+ * 处理后台知识工厂的手动总结请求，正文不足时直接返回明确提示。
+ * @param {Request} req 管理后台发起的 POST 请求。
+ * @returns {Promise<NextResponse>} 总结结果或错误信息。
+ */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    const isAdmin = 
-      session?.user?.email?.toLowerCase().includes("admin") || 
-      session?.user?.name?.toLowerCase().includes("admin");
-
-    if (!isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden: Admins only' },
-        { status: 403 }
-      );
+    const authResult = await requireAdminUser();
+    if (isAuthorizationFailure(authResult)) {
+      return authResult.response;
     }
 
     const body = (await req.json().catch(() => ({}))) as {
@@ -40,7 +38,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // Call the summarizer logic
+    const sufficiency = evaluateRawSummaryText(text);
+    if (!sufficiency.isSufficient) {
+      return NextResponse.json({ error: sufficiency.message }, { status: 422 });
+    }
+
     const summary = await summarizeDocument(text);
 
     return NextResponse.json({
@@ -52,7 +54,7 @@ export async function POST(req: Request) {
     const msg = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
       { error: msg },
-      { status: 500 }
+      { status: /信息不足/.test(msg) ? 422 : 500 }
     );
   }
 }

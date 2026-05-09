@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface KBDocument {
   id: string;
@@ -18,7 +17,6 @@ export default function KnowledgeAdminPage() {
   const [uploading, setUploading] = useState(false);
   const [githubUrl, setGithubUrl] = useState("");
   const [activeTab, setActiveTab] = useState<"file" | "github">("file");
-  const router = useRouter();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -27,7 +25,7 @@ export default function KnowledgeAdminPage() {
       const res = await fetch("/api/admin/kb");
       if (res.status === 401) {
         // router.push("/login"); // Don't auto redirect just show error or let user know
-        throw new Error("无权限访问：只有 admin@resumer.com 可查看");
+        throw new Error("无权限访问：仅管理员可查看");
       }
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));

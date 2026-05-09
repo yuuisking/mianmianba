@@ -1,0 +1,121 @@
+<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="980" fill="#faf9f5"/>
+
+  <text x="72" y="92" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="42" font-weight="700">
+    面面吧 · Logo Directions Overview
+  </text>
+  <text x="72" y="132" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+    三个明显不同的方向：对话人物 / 中文印章 / 科技字母
+  </text>
+
+  <rect x="56" y="184" width="472" height="716" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="92" y="236" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="30" font-weight="700">
+    A. 对话人物版
+  </text>
+  <text x="92" y="272" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="20">
+    场景感最强，最像真实面试产品
+  </text>
+  <g transform="translate(128 330)">
+    <rect x="0" y="0" width="132" height="132" rx="34" fill="#141413"/>
+    <circle cx="44" cy="46" r="12" fill="#faf9f5"/>
+    <rect x="28" y="63" width="32" height="27" rx="13.5" fill="#faf9f5"/>
+    <circle cx="88" cy="46" r="12" fill="#faf9f5"/>
+    <rect x="72" y="63" width="32" height="27" rx="13.5" fill="#faf9f5"/>
+    <rect x="60" y="34" width="12" height="55" rx="6" fill="#d97757"/>
+    <circle cx="66" cy="23" r="9" fill="#d97757"/>
+    <path d="M45 105C50.3333 110.333 57.3333 113 66 113C74.6667 113 81.6667 110.333 87 105" stroke="#788c5d" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <text x="300" y="406" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="56" font-weight="700">
+    面面吧
+  </text>
+  <text x="92" y="544" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    适合
+  </text>
+  <text x="92" y="590" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    首页导航、登录页品牌位、主视觉
+  </text>
+  <text x="92" y="634" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    气质
+  </text>
+  <text x="92" y="680" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    稳重、可信、产品化
+  </text>
+  <text x="92" y="724" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    关键词
+  </text>
+  <text x="92" y="770" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    面试官、候选人、对话主线
+  </text>
+
+  <rect x="564" y="184" width="472" height="716" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="600" y="236" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="30" font-weight="700">
+    B. 中文印章版
+  </text>
+  <text x="600" y="272" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="20">
+    中文品牌识别最强，更像长期品牌资产
+  </text>
+  <g transform="translate(636 330)">
+    <rect x="0" y="0" width="132" height="132" rx="34" fill="#141413"/>
+    <rect x="27" y="24" width="78" height="78" rx="18" stroke="#faf9f5" stroke-width="10"/>
+    <rect x="43" y="40" width="46" height="46" rx="10" stroke="#d97757" stroke-width="8"/>
+    <path d="M18 114H116" stroke="#788c5d" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="116" cy="114" r="10" fill="#6a9bcc"/>
+  </g>
+  <text x="808" y="406" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="56" font-weight="700">
+    面面吧
+  </text>
+  <text x="600" y="544" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    适合
+  </text>
+  <text x="600" y="590" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    品牌升级、官网、长期识别体系
+  </text>
+  <text x="600" y="634" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    气质
+  </text>
+  <text x="600" y="680" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    东方、原创、沉稳
+  </text>
+  <text x="600" y="724" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    关键词
+  </text>
+  <text x="600" y="770" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    面字结构、印章、品牌归属感
+  </text>
+
+  <rect x="1072" y="184" width="472" height="716" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="1108" y="236" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="30" font-weight="700">
+    C. 科技字母版
+  </text>
+  <text x="1108" y="272" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="20">
+    更像 AI / SaaS 产品，科技感最强
+  </text>
+  <g transform="translate(1144 330)">
+    <rect x="0" y="0" width="132" height="132" rx="34" fill="#141413"/>
+    <path d="M30 92V42C30 34.268 36.268 28 44 28H52C56.784 28 61.248 30.442 63.84 34.484L68 40.968L72.16 34.484C74.752 30.442 79.216 28 84 28H92C99.732 28 106 34.268 106 42V92" stroke="#faf9f5" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M38 84H98" stroke="#6a9bcc" stroke-width="8" stroke-linecap="round"/>
+    <path d="M34 102L48 90" stroke="#d97757" stroke-width="8" stroke-linecap="round"/>
+    <path d="M102 102L88 90" stroke="#788c5d" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <text x="1316" y="406" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="56" font-weight="700">
+    面面吧
+  </text>
+  <text x="1108" y="544" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    适合
+  </text>
+  <text x="1108" y="590" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    AI 产品、SaaS 首页、数字化界面
+  </text>
+  <text x="1108" y="634" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    气质
+  </text>
+  <text x="1108" y="680" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    现代、锐利、互联网感强
+  </text>
+  <text x="1108" y="724" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="24" font-weight="700">
+    关键词
+  </text>
+  <text x="1108" y="770" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    M、气泡、AI、数字产品
+  </text>
+</svg>

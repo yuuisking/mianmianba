@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { deleteDocumentFromKB, uploadDocumentToKB } from '@/lib/knowledge/volc';
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { isAuthorizationFailure, requireAdminUser } from "@/lib/permissions";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.email !== "admin@resumer.com") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authResult = await requireAdminUser();
+    if (isAuthorizationFailure(authResult)) {
+      return authResult.response;
     }
-    
+
+    const adminUser = authResult.user;
+
     const docs = await prisma.knowledgeDocument.findMany({
-      where: { userId: session.user.id },
+      where: { userId: adminUser.id },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -40,10 +41,12 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.email !== "admin@resumer.com") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authResult = await requireAdminUser();
+    if (isAuthorizationFailure(authResult)) {
+      return authResult.response;
     }
+
+    const adminUser = authResult.user;
 
     const formData = await req.formData();
     const file = formData.get("file") as File;
@@ -58,7 +61,7 @@ export async function POST(req: Request) {
       
       // Duplicate check for file upload
       const existing = await prisma.knowledgeDocument.findFirst({
-        where: { userId: session.user.id, name: file.name, sourceType: 'file' }
+        where: { userId: adminUser.id, name: file.name, sourceType: 'file' }
       });
       if (existing) {
         return NextResponse.json({ error: "该文件已存在，请勿重复上传" }, { status: 400 });
@@ -69,7 +72,7 @@ export async function POST(req: Request) {
 
       await prisma.knowledgeDocument.create({
         data: {
-          userId: session.user.id,
+          userId: adminUser.id,
           name: file.name,
           sourceType: 'file',
           size: buffer.length,
@@ -84,7 +87,7 @@ export async function POST(req: Request) {
 
       await prisma.knowledgeDocument.create({
         data: {
-          userId: session.user.id,
+          userId: adminUser.id,
           name: filename,
           sourceType: 'text',
           size: Buffer.byteLength(textContent, 'utf8'),
@@ -141,7 +144,7 @@ export async function POST(req: Request) {
           
           // Duplicate check for github whole repo import
           const existing = await prisma.knowledgeDocument.findFirst({
-            where: { userId: session.user.id, sourceUrl: rawUrl }
+            where: { userId: adminUser.id, sourceUrl: rawUrl }
           });
           if (existing) {
             continue; // Skip this file and proceed to next
@@ -155,7 +158,7 @@ export async function POST(req: Request) {
             if (arkDocId) {
               await prisma.knowledgeDocument.create({
                 data: {
-                  userId: session.user.id,
+                  userId: adminUser.id,
                   name: extractedFilename,
                   sourceType: 'github',
                   sourceUrl: rawUrl,
@@ -178,7 +181,7 @@ export async function POST(req: Request) {
         
         // Duplicate check for specific github file import
         const existing = await prisma.knowledgeDocument.findFirst({
-          where: { userId: session.user.id, sourceUrl: fetchUrl }
+          where: { userId: adminUser.id, sourceUrl: fetchUrl }
         });
         if (existing) {
           return NextResponse.json({ error: "该文件已存在，请勿重复导入" }, { status: 400 });
@@ -196,7 +199,7 @@ export async function POST(req: Request) {
 
         await prisma.knowledgeDocument.create({
           data: {
-            userId: session.user.id,
+            userId: adminUser.id,
             name: extractedFilename,
             sourceType: 'github',
             sourceUrl: fetchUrl,
@@ -220,11 +223,12 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.email !== "admin@resumer.com") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authResult = await requireAdminUser();
+    if (isAuthorizationFailure(authResult)) {
+      return authResult.response;
     }
 
+    const adminUser = authResult.user;
     const body = await req.json().catch(() => ({}));
     
     // Bulk Delete
@@ -236,7 +240,7 @@ export async function DELETE(req: Request) {
 
       const docs = await prisma.knowledgeDocument.findMany({
         where: { 
-          userId: session.user.id,
+          userId: adminUser.id,
           id: { in: ids }
         },
       });
@@ -250,7 +254,7 @@ export async function DELETE(req: Request) {
       
       await prisma.knowledgeDocument.deleteMany({
         where: { 
-          userId: session.user.id,
+          userId: adminUser.id,
           id: { in: ids }
         },
       });
@@ -264,7 +268,7 @@ export async function DELETE(req: Request) {
     }
 
     const doc = await prisma.knowledgeDocument.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId: adminUser.id },
     });
     if (!doc) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

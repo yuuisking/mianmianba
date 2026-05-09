@@ -1,20 +1,8 @@
 import type { Metadata } from "next";
-import { Poppins, Lora } from "next/font/google";
+import type { CSSProperties } from "react";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import AuthProvider from "@/components/providers/AuthProvider";
-
-const poppins = Poppins({
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-poppins",
-  subsets: ["latin"],
-});
-
-const lora = Lora({
-  weight: ["400", "500", "600"],
-  variable: "--font-lora",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "面面吧",
@@ -29,7 +17,15 @@ export default function RootLayout({
   return (
     <html
       lang="zh-CN"
-      className={`${poppins.variable} ${lora.variable} h-full antialiased`}
+      className="h-full antialiased"
+      style={
+        {
+          "--font-poppins":
+            '"PingFang SC", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif',
+          "--font-lora":
+            '"Songti SC", "Noto Serif SC", "STSong", Georgia, serif',
+        } as CSSProperties
+      }
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>

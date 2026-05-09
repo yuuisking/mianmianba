@@ -10,17 +10,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum UserRole {
+  USER
+  ADMIN
+}
 
-  sessions   InterviewSession[]
-  weaknesses Weakness[]
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  password     String
+  name         String?
+  nickname     String?
+  avatarUrl    String?
+  role         UserRole    @default(USER)
+  status       UserStatus  @default(ACTIVE)
+  vipType      String      @default("none")
+  vipExpiresAt DateTime?
+  lastLoginAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sessions           InterviewSession[]
+  weaknesses         Weakness[]
   knowledgeDocuments KnowledgeDocument[]
+  questionProgress   UserQuestionProgress[]
 }
 
 model InterviewSession {
@@ -81,4 +99,444 @@ model KnowledgeDocument {
   arkDocId   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// ==================== 面试题库系统模型 ====================
+
+enum QuestionDifficulty {
+  easy
+  medium
+  hard
+}
+
+enum QuestionStatus {
+  draft
+  published
+  archived
+}
+
+enum InterviewFrequency {
+  high
+  medium
+  low
+}
+
+model KnowledgeBase {
+  id          String   @id @default(cuid())
+  name        String
+  subtitle    String?
+  description String?
+  tags        String[] @default([])
+  visibility  String   @default("public") // "public" | "private"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categories Category[]
+  questions  Question[]
+}
+
+model Category {
+  id          String @id @default(cuid())
+  kbId        String
+  knowledgeBase KnowledgeBase @relation(fields: [kbId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  sortOrder   Int    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  questions Question[]
+
+  @@index([kbId])
+}
+
+model Question {
+  id          String   @id @default(cuid())
+  kbId        String
+  knowledgeBase KnowledgeBase @relation(fields: [kbId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title       String
+  difficulty  QuestionDifficulty @default(medium)
+  tags        String[] @default([])
+  answerKeyPoints     String[] @default([])
+  answerDetailed      String   @default("")
+  answerCodeExample   String?
+  answerDiagram       String?
+  relatedQuestionIds  String[] @default([])
+  interviewFrequency  InterviewFrequency @default(medium)
+  sourceUrl   String?
+  status      QuestionStatus @default(draft)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+
+  progress UserQuestionProgress[]
+
+  @@index([kbId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([difficulty])
+}
+
+model UserQuestionProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  viewed      Boolean  @default(false)
+  attempted   Boolean  @default(false)
+  correct     Boolean  @default(false)
+  mastered    Boolean  @default(false)
+  bookmarked  Boolean  @default(false)
+  attemptCount Int     @default(0)
+  lastAttemptAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@index([questionId])
+}
+
+// ==================== 学习中心 v2：复刻 demo 的题库/章节/文档/质量体系 ====================
+
+model TopicCategory {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  description String?
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  topicBanks  TopicBank[]
+
+  @@map("topic_categories")
+}
+
+model TopicBank {
+  id             String    @id @default(cuid())
+  name           String
+  slug           String    @unique
+  description    String?
+  categoryId     String
+  targetRole     String?
+  difficulty     String?
+  status         String    @default("DRAFT")
+  coverUrl       String?
+  sortOrder      Int       @default(0)
+  isFeatured     Boolean   @default(false)
+  documentCount  Int       @default(0)
+  questionCount  Int       @default(0)
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  category   TopicCategory @relation(fields: [categoryId], references: [id])
+  chapters   Chapter[]
+  documents  Document[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("topic_banks")
+}
+
+model Chapter {
+  id          String    @id @default(cuid())
+  topicBankId String
+  name        String
+  slug        String
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  topicBank TopicBank  @relation(fields: [topicBankId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@unique([topicBankId, slug])
+  @@index([topicBankId])
+  @@map("chapters")
+}
+
+model Document {
+  id               String    @id @default(cuid())
+  topicBankId      String
+  chapterId        String?
+  title            String
+  slug             String
+  summary          String?
+  difficulty       String    @default("medium")
+  frequency        String    @default("medium")
+  status           String    @default("DRAFT")
+  currentVersionId String?
+  qualityScore     Float?
+  originalityScore Float?
+  viewCount        Int       @default(0)
+  favoriteCount    Int       @default(0)
+  publishedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  topicBank        TopicBank                  @relation(fields: [topicBankId], references: [id], onDelete: Cascade)
+  chapter          Chapter?                   @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  versions         DocumentVersion[]
+  tags             DocumentTag[]
+  favorites        Favorite[]
+  progress         LearningProgress[]
+  interviewSessions DocumentInterviewSession[]
+  answerScores     UserAnswerScore[]
+  qualityReports   QualityReport[]
+  reviewTasks      ReviewTask[]
+  feedbacks        Feedback[]
+  sourceMaterials  SourceMaterial[]
+
+  @@unique([topicBankId, slug])
+  @@index([topicBankId])
+  @@index([chapterId])
+  @@index([status])
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id               String    @id @default(cuid())
+  documentId       String
+  version          Int       @default(1)
+  learningContent  Json?
+  interviewContent Json?
+  markdownContent  String?
+  sourceSnapshot   Json?
+  qualityReportId  String?
+  createdBy        String?
+  createdByType    String    @default("ai")
+  changeLog        String?
+  createdAt        DateTime  @default(now())
+
+  document      Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  qualityReport QualityReport? @relation(fields: [qualityReportId], references: [id])
+
+  @@index([documentId])
+  @@map("document_versions")
+}
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  slug      String        @unique
+  createdAt DateTime      @default(now())
+  documents DocumentTag[]
+
+  @@map("tags")
+}
+
+model DocumentTag {
+  id         String   @id @default(cuid())
+  documentId String
+  tagId      String
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, tagId])
+  @@index([tagId])
+  @@map("document_tags")
+}
+
+model Favorite {
+  id         String   @id @default(cuid())
+  userId     String
+  documentId String
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId])
+  @@map("favorites")
+}
+
+model LearningProgress {
+  id         String   @id @default(cuid())
+  userId     String
+  documentId String
+  status     String   @default("NOT_STARTED")
+  score      Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId])
+  @@map("learning_progress")
+}
+
+model DocumentInterviewSession {
+  id         String    @id @default(cuid())
+  userId     String
+  documentId String
+  status     String    @default("ACTIVE")
+  totalScore Float?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  document         Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userAnswerScores UserAnswerScore[]
+
+  @@index([userId])
+  @@index([documentId])
+  @@map("document_interview_sessions")
+}
+
+model UserAnswerScore {
+  id                 String   @id @default(cuid())
+  sessionId          String
+  userId             String
+  documentId         String
+  question           String
+  userAnswer         String
+  standardAnswer     String?
+  score              Float?
+  hitPoints          Json?
+  missingPoints      Json?
+  factErrors         Json?
+  expressionFeedback String?
+  improvedAnswer     String?
+  nextQuestion       String?
+  criterionScores    Json?
+  createdAt          DateTime @default(now())
+
+  session  DocumentInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  document Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([documentId])
+  @@map("user_answer_scores")
+}
+
+model AiTask {
+  id           String    @id @default(cuid())
+  taskType     String
+  status       String    @default("PENDING")
+  targetType   String?
+  targetId     String?
+  input        Json?
+  output       Json?
+  errorMessage String?
+  retryCount   Int       @default(0)
+  tokenUsage   Json?
+  costEstimate Float?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  steps AiTaskStep[]
+
+  @@index([status])
+  @@index([targetType, targetId])
+  @@map("ai_tasks")
+}
+
+model AiTaskStep {
+  id           String    @id @default(cuid())
+  taskId       String
+  agentName    String
+  stepOrder    Int
+  status       String    @default("PENDING")
+  input        Json?
+  output       Json?
+  errorMessage String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+
+  task AiTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("ai_task_steps")
+}
+
+model QualityReport {
+  id               String   @id @default(cuid())
+  documentId       String
+  versionId        String?
+  totalScore       Float?
+  factScore        Float?
+  learningScore    Float?
+  interviewScore   Float?
+  originalityScore Float?
+  readabilityScore Float?
+  codeDiagramScore Float?
+  issues           Json?
+  suggestions      Json?
+  pass             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  document Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versions DocumentVersion[]
+
+  @@index([documentId])
+  @@map("quality_reports")
+}
+
+model ReviewTask {
+  id         String   @id @default(cuid())
+  documentId String
+  reviewerId String?
+  reviewType String
+  status     String   @default("PENDING")
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("review_tasks")
+}
+
+model Feedback {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  type       String
+  content    String
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("feedbacks")
+}
+
+model SourceMaterial {
+  id         String   @id @default(cuid())
+  documentId String
+  versionId  String?
+  sourceUrl  String
+  sourceType String
+  trustLevel String
+  facts      Json?
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("source_materials")
+}
+
+model PromptTemplate {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  type      String
+  version   Int      @default(1)
+  content   String
+  variables Json?
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("prompt_templates")
 }

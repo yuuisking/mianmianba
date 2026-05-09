@@ -1,9 +1,18 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 
-export async function GET(req: NextRequest) {
+/**
+ * 统一提取接口异常信息。
+ * @param {unknown} error 捕获到的异常对象。
+ * @returns {string} 可安全输出的错误文本。
+ */
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -21,8 +30,8 @@ export async function GET(req: NextRequest) {
     });
 
     const reports = sessions
-      .map(session => session.report)
-      .filter(report => report !== null);
+      .map((session) => session.report)
+      .filter((report) => report !== null);
 
     // Get weaknesses for this user
     const weaknesses = await prisma.weakness.findMany({
@@ -33,9 +42,9 @@ export async function GET(req: NextRequest) {
       data: {
         reports,
         weaknesses,
-      }
+      },
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 }

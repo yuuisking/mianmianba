@@ -1,526 +1,503 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
-type KbInfo = {
+type QuestionDifficulty = "easy" | "medium" | "hard";
+type InterviewFrequency = "high" | "medium" | "low";
+
+type BankCard = {
   id: string;
   name: string;
   subtitle: string;
+  description: string;
   tags: string[];
   updatedAt: string;
-  stats: { topics: number; paths: number };
+  cover: string;
+  categoryCount: number;
+  questionCount: number;
+  featuredCategories: string[];
+  defaultQuestionPath: string | null;
 };
 
-type TreeData = {
+type CategorySummary = {
+  id: string;
+  name: string;
+  description: string;
+  questionCount: number;
+  featuredQuestionTitles: string[];
+};
+
+type DocumentSummary = {
   id: string;
   title: string;
-  groups: Array<{
+  summary: string | null;
+  difficulty: QuestionDifficulty;
+  interviewFrequency: InterviewFrequency;
+  status: string;
+  qualityScore: number | null;
+  tags: string[];
+  categoryId: string;
+  categoryName: string;
+  versionCount: number;
+  latestVersion: number;
+  latestVersionAt: string | null;
+  latestVersionSource: string | null;
+  latestReview: {
     id: string;
-    title: string;
-    children: Array<{
-      id: string;
-      title: string;
-    }>;
-  }>;
+    reviewType: string;
+    status: string;
+    comment: string | null;
+    updatedAt: string;
+  } | null;
+  sourceCount: number;
+  updatedAt: string;
 };
 
-type DraftSummaryData = {
-  topic: string;
-  content: {
-    quickFacts?: Array<{ k: string; v: string }>;
-    sections?: Array<{
-      id: string;
-      h2: string;
-      paragraphs?: string[];
-      bullets?: string[];
-      callout?: string;
-    }>;
-  };
+type ReviewTaskSummary = {
+  id: string;
+  documentId: string;
+  documentTitle: string;
+  reviewType: string;
+  status: string;
+  reviewerId: string | null;
+  comment: string | null;
+  updatedAt: string;
 };
 
-function safeDecodeURIComponent(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
+type AiTaskSummary = {
+  id: string;
+  taskType: string;
+  status: string;
+  targetId: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+};
+
+type StudioDetailResponse = {
+  success: boolean;
+  bank: BankCard;
+  categories: CategorySummary[];
+  documents: DocumentSummary[];
+  reviewTasks: ReviewTaskSummary[];
+  aiTasks: AiTaskSummary[];
+};
+
+type BankAuditSummary = {
+  total: number;
+  blocked: number;
+  review: number;
+  published: number;
+};
+
+const QUESTION_DIFFICULTY_LABEL: Record<QuestionDifficulty, string> = {
+  easy: "简单",
+  medium: "中等",
+  hard: "困难",
+};
+
+const INTERVIEW_FREQUENCY_LABEL: Record<InterviewFrequency, string> = {
+  high: "高频",
+  medium: "常规",
+  low: "低频",
+};
+
+/**
+ * 将时间格式化为适合后台列表展示的文案。
+ * @param {string | null | undefined} value 原始时间字符串。
+ * @returns {string} 中文展示文本。
+ */
+function formatTime(value?: string | null): string {
+  if (!value) {
+    return "暂无";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
     return value;
   }
+
+  return date.toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-export default function AdminLearningKbEditPage() {
+/**
+ * 学习中心题库详情页，展示章节、文档、审核与 AI 任务。
+ * @returns {ReactNode} 管理端题库详情页。
+ */
+export default function AdminKbDetailPage(): ReactNode {
   const router = useRouter();
-  const params = useParams<{ kbId?: string | string[] }>();
-  const kbId = useMemo(() => {
-    const raw = Array.isArray(params?.kbId) ? params.kbId[0] : params?.kbId;
-    return safeDecodeURIComponent(raw || "");
-  }, [params]);
+  const params = useParams();
+  const kbId = typeof params.kbId === "string" ? params.kbId : "";
 
-  const [kb, setKb] = useState<KbInfo | null>(null);
-  const [tree, setTree] = useState<TreeData | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [subject, setSubject] = useState("默认分类");
-  const [text, setText] = useState("");
-  const [draftId, setDraftId] = useState("");
-  const [summary, setSummary] = useState<DraftSummaryData | null>(null);
-
-  const [parsing, setParsing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [auditing, setAuditing] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [detail, setDetail] = useState<StudioDetailResponse | null>(null);
+  const [auditSummary, setAuditSummary] = useState<BankAuditSummary | null>(null);
+  const [difficultyFilter, setDifficultyFilter] = useState<"" | QuestionDifficulty>("");
+  const [frequencyFilter, setFrequencyFilter] = useState<"" | InterviewFrequency>("");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
-  // UI state for generating taxonomy
-  const [generatingTaxonomy, setGeneratingTaxonomy] = useState(false);
-  const [taxonomyDescription, setTaxonomyDescription] = useState("");
-
-  // UI state for adding manual node
-  const [newSubjectId, setNewSubjectId] = useState("");
-  const [newSubjectTitle, setNewSubjectTitle] = useState("");
-  const [addingSubject, setAddingSubject] = useState(false);
-
-  const [selectedSubjectIdForTopic, setSelectedSubjectIdForTopic] = useState("");
-  const [newTopicId, setNewTopicId] = useState("");
-  const [newTopicTitle, setNewTopicTitle] = useState("");
-  const [addingTopic, setAddingTopic] = useState(false);
-
-  const refresh = async () => {
-    setLoading(true);
-    const res = await fetch("/api/learning");
-    const data = await res.json().catch(() => ({}));
-    const foundKb = Array.isArray(data.kbs) ? data.kbs.find((x: KbInfo) => x.id === kbId) : undefined;
-    setKb(foundKb || null);
-    setTree(data.trees?.[kbId] || null);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (!kbId) return;
-    refresh().catch(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  /**
+   * 拉取题库详情快照。
+   * @returns {Promise<void>} 请求完成后更新详情页状态。
+   */
+  const loadDetail = useCallback(async (): Promise<void> => {
+    const response = await fetch(`/api/admin/learning/studio/${encodeURIComponent(kbId)}`, {
+      cache: "no-store",
+    });
+    const data = (await response.json().catch(() => ({}))) as StudioDetailResponse | { error?: string };
+    if (!response.ok || !("success" in data) || !data.success) {
+      throw new Error("error" in data && data.error ? data.error : "加载题库详情失败");
+    }
+    setDetail(data);
   }, [kbId]);
 
-  const [importing, setImporting] = useState(false);
-  const [importLogs, setImportLogs] = useState<string[]>([]);
-  const [githubUrl, setGithubUrl] = useState("");
-
-  const handleParse = async () => {
-    setError("");
-    setSuccess("");
-    setDraftId("");
-    setSummary(null);
-    setImportLogs([]);
-
-    const payloadText = text.trim();
-    const payloadSubject = subject.trim();
-    if (!payloadText || !kbId || !payloadSubject) return;
-
-    setParsing(true);
+  /**
+   * 刷新当前详情页数据。
+   * @param {boolean} initial 是否为首屏加载。
+   * @returns {Promise<void>} 刷新结束。
+   */
+  const refreshDetail = useCallback(async (initial = false): Promise<void> => {
     try {
-      const res = await fetch("/api/admin/learning/ingest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kbId, subject: payloadSubject, text: payloadText }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "解析失败");
-
-      setDraftId(typeof json.draftId === "string" ? json.draftId : "");
-      setSummary(json.summary as DraftSummaryData);
-      setSuccess("解析完成：已生成草稿。");
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "解析失败");
-    } finally {
-      setParsing(false);
-    }
-  };
-
-  const handleBatchImport = async () => {
-    if (!githubUrl.trim() || !kbId) return;
-    
-    setError("");
-    setSuccess("");
-    setDraftId("");
-    setSummary(null);
-    setImportLogs([]);
-    setImporting(true);
-
-    try {
-      const res = await fetch("/api/admin/learning/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kbId, githubUrl: githubUrl.trim(), limit: 0 }), // 0 = no limit
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "导入失败");
+      if (initial) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
       }
+      setError("");
+      await loadDetail();
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : "加载题库详情失败");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [loadDetail]);
 
-      if (!res.body) throw new Error("No response body");
+  useEffect(() => {
+    void refreshDetail(true);
+  }, [refreshDetail]);
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+  /**
+   * 删除当前题库。
+   * @returns {Promise<void>} 删除完成后返回后台首页。
+   */
+  async function handleDeleteBank(): Promise<void> {
+    if (!detail?.bank) {
+      return;
+    }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+    const accepted = window.confirm(`确定删除题库“${detail.bank.name}”吗？该题库下的文档、版本、审核和任务都会一起删除。`);
+    if (!accepted) {
+      return;
+    }
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        
-        // 保留最后一个可能不完整的行
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const data = JSON.parse(line);
-            if (data.message) {
-              if (data.message === "__DONE__") {
-                setSuccess("批量导入完成！");
-                refresh(); // refresh the tree data
-              } else {
-                setImportLogs(prev => [...prev, data.message]);
-              }
-            }
-          } catch (e) {
-            console.error("Failed to parse log line", line);
-          }
-        }
+    try {
+      setDeleting(true);
+      setError("");
+      const response = await fetch(`/api/admin/learning/studio/${encodeURIComponent(kbId)}`, {
+        method: "DELETE",
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "删除题库失败");
       }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "导入请求失败");
+      router.push("/admin/learning");
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "删除题库失败");
     } finally {
-      setImporting(false);
+      setDeleting(false);
     }
-  };
+  }
 
-  const handleTopicDelete = async (subjectId: string, topicId: string, topicTitle: string) => {
-    if (!window.confirm(`确定要删除专题 "${topicTitle}" 吗？此操作不可恢复！`)) return;
+  /**
+   * 运行当前题库的 AI 抽检，将结果写回质量报告、审核任务和 AI 任务。
+   * @returns {Promise<void>} 抽检结束后刷新详情页。
+   */
+  async function handleRunQualityAudit(): Promise<void> {
+    if (!kbId) {
+      return;
+    }
 
     try {
-      const res = await fetch(
-        `/api/admin/learning/topic?kbId=${encodeURIComponent(kbId)}&subjectId=${encodeURIComponent(subjectId)}&topicId=${encodeURIComponent(topicId)}`,
-        { method: "DELETE" }
-      );
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "删除失败");
-
-      setSuccess(`已删除专题 "${topicTitle}"。`);
-      await refresh();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "删除失败");
-    }
-  };
-
-  const handleGenerateTaxonomy = async () => {
-    if (!kbId) return;
-    setError("");
-    setSuccess("");
-    setGeneratingTaxonomy(true);
-
-    try {
-      const res = await fetch("/api/admin/learning/taxonomy", {
+      setAuditing(true);
+      setError("");
+      setAuditSummary(null);
+      const response = await fetch("/api/admin/learning/quality-audit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kbId, description: taxonomyDescription }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ bankId: kbId }),
       });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "生成大纲失败");
-
-      setSuccess("大纲生成成功！");
-      setTaxonomyDescription("");
-      await refresh();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "生成大纲失败");
+      const data = (await response.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+        result?: BankAuditSummary;
+      };
+      if (!response.ok || !data.success || !data.result) {
+        throw new Error(data.error || "运行 AI 抽检失败");
+      }
+      setAuditSummary(data.result);
+      await refreshDetail();
+    } catch (auditError) {
+      setError(auditError instanceof Error ? auditError.message : "运行 AI 抽检失败");
     } finally {
-      setGeneratingTaxonomy(false);
+      setAuditing(false);
     }
-  };
+  }
 
-  const handleAddSubject = async () => {
-    if (!kbId || !newSubjectId.trim() || !newSubjectTitle.trim()) return;
-    setError("");
-    setSuccess("");
-    setAddingSubject(true);
+  const categories = useMemo(() => detail?.categories ?? [], [detail]);
+  const documents = useMemo(() => detail?.documents ?? [], [detail]);
+  const reviewTasks = useMemo(() => detail?.reviewTasks ?? [], [detail]);
+  const aiTasks = useMemo(() => detail?.aiTasks ?? [], [detail]);
 
-    try {
-      const res = await fetch("/api/admin/learning/node", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "subject",
-          kbId,
-          subjectId: newSubjectId.trim(),
-          subjectTitle: newSubjectTitle.trim()
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "添加分类失败");
+  const filteredDocuments = useMemo(() => {
+    return documents.filter((document) => {
+      if (difficultyFilter && document.difficulty !== difficultyFilter) {
+        return false;
+      }
+      if (frequencyFilter && document.interviewFrequency !== frequencyFilter) {
+        return false;
+      }
+      if (categoryFilter && document.categoryId !== categoryFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [categoryFilter, difficultyFilter, documents, frequencyFilter]);
 
-      setSuccess("分类添加成功！");
-      setNewSubjectId("");
-      setNewSubjectTitle("");
-      await refresh();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "添加分类失败");
-    } finally {
-      setAddingSubject(false);
-    }
-  };
-
-  const handleAddTopic = async () => {
-    if (!kbId || !selectedSubjectIdForTopic || !newTopicId.trim() || !newTopicTitle.trim()) return;
-    setError("");
-    setSuccess("");
-    setAddingTopic(true);
-
-    try {
-      const res = await fetch("/api/admin/learning/node", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "topic",
-          kbId,
-          subjectId: selectedSubjectIdForTopic,
-          topicId: newTopicId.trim(),
-          topicTitle: newTopicTitle.trim()
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "添加专题失败");
-
-      setSuccess("专题添加成功！");
-      setNewTopicId("");
-      setNewTopicTitle("");
-      await refresh();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "添加专题失败");
-    } finally {
-      setAddingTopic(false);
-    }
-  };
-
-  return (
-    <div className="container" style={{ padding: "18px 18px 40px 18px" }}>
-      <div className="panel">
-        <div className="panel-header">
-          <div className="panel-title">知识库编辑</div>
-          <button className="btn" onClick={() => router.push("/admin/learning")}>
-            返回
-          </button>
-        </div>
-
-        <div className="panel-body">
-          <div className="hero" style={{ marginBottom: "12px" }}>
-            <div className="breadcrumbs">
-              <span className="chip">KB</span>
-              <span>·</span>
-              <span className="text-muted">{kb?.name || kbId}</span>
-            </div>
-            <h1 style={{ marginBottom: "6px" }}>{kb?.name || "未命名知识库"}</h1>
-            <p className="text-muted" style={{ margin: 0 }}>
-              输入来源并点击“解析”，生成草稿后进入预览页编辑并发布。
-            </p>
-          </div>
-
-          {loading ? <div className="notice">加载中...</div> : null}
-          {!loading && !kb ? (
-            <div className="notice">未找到该 KB（{kbId}）。你仍可以继续解析与发布（会自动创建必要的数据结构）。</div>
-          ) : null}
-
-          {success ? (
-            <div
-              className="notice"
-              style={{ borderColor: "rgba(120,140,93,0.8)", color: "var(--accent-green)", marginBottom: "12px" }}
-            >
-              {success}
-            </div>
-          ) : null}
-          {error ? (
-            <div
-              className="notice"
-              style={{ borderColor: "rgba(217,119,87,0.8)", color: "var(--accent-orange)", marginBottom: "12px" }}
-            >
-              {error}
-            </div>
-          ) : null}
-
-          <div className="field">
-            <div className="label">Subject（单篇分类）</div>
-            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="默认分类" />
-          </div>
-
-          <div className="field">
-            <div className="label">Source（单篇URL/文本）</div>
-            <textarea
-              rows={6}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="例如：https://github.com/... 或 https://... 或直接粘贴文章/Markdown"
-            />
-          </div>
-
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end", marginBottom: "20px" }}>
-            {draftId ? (
-              <button
-                className="btn"
-                onClick={() =>
-                  router.push(`/admin/learning/${encodeURIComponent(kbId)}/draft/${encodeURIComponent(draftId)}`)
-                }
-              >
-                单篇预览
-              </button>
-            ) : null}
-            <button
-              className="btn btn-primary"
-              onClick={handleParse}
-              disabled={parsing || !text.trim() || !subject.trim() || importing}
-              style={{ opacity: parsing || !text.trim() || !subject.trim() || importing ? 0.7 : 1 }}
-            >
-              {parsing ? "解析中..." : "单篇解析"}
-            </button>
-          </div>
-
-          <div className="hr" style={{ margin: "20px 0" }}></div>
-
-          <h2 style={{ fontSize: "16px", marginBottom: "12px", color: "var(--accent-blue)" }}>体系大纲：一键AI生成</h2>
-          <div className="field">
-            <div className="label">附加提示词（可选）</div>
-            <textarea
-              rows={3}
-              value={taxonomyDescription}
-              onChange={(e) => setTaxonomyDescription(e.target.value)}
-              placeholder="例如：侧重于前端工程化，分为基础、进阶、实战三个阶段"
-            />
-          </div>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end", marginBottom: "20px" }}>
-            <button
-              className="btn btn-primary"
-              onClick={handleGenerateTaxonomy}
-              disabled={generatingTaxonomy}
-              style={{ opacity: generatingTaxonomy ? 0.7 : 1, background: "var(--accent-blue)" }}
-            >
-              {generatingTaxonomy ? "正在生成..." : "一键AI生成标准大纲"}
-            </button>
-          </div>
-
-          <div className="hr" style={{ margin: "20px 0" }}></div>
-
-          <h2 style={{ fontSize: "16px", marginBottom: "12px", color: "var(--text-dark)", fontFamily: "var(--font-heading)" }}>手动创建大纲节点</h2>
-          <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
-            {/* 添加分类 */}
-            <div style={{ flex: 1, minWidth: "280px", background: "var(--bg-subtle)", padding: "16px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
-              <h3 style={{ fontSize: "14px", marginBottom: "12px", fontWeight: 600 }}>添加分类 (Group/Subject)</h3>
-              <div className="field" style={{ marginBottom: "8px" }}>
-                <input value={newSubjectId} onChange={(e) => setNewSubjectId(e.target.value)} placeholder="分类ID (如 frontend-basic)" style={{ width: "100%", padding: "6px 10px", fontSize: "13px" }} />
-              </div>
-              <div className="field" style={{ marginBottom: "12px" }}>
-                <input value={newSubjectTitle} onChange={(e) => setNewSubjectTitle(e.target.value)} placeholder="分类名称 (如 前端基础)" style={{ width: "100%", padding: "6px 10px", fontSize: "13px" }} />
-              </div>
-              <button
-                className="btn"
-                onClick={handleAddSubject}
-                disabled={addingSubject || !newSubjectId.trim() || !newSubjectTitle.trim()}
-                style={{ width: "100%", justifyContent: "center" }}
-              >
-                {addingSubject ? "添加中..." : "添加分类"}
-              </button>
-            </div>
-
-            {/* 添加专题 */}
-            <div style={{ flex: 1, minWidth: "280px", background: "var(--bg-subtle)", padding: "16px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
-              <h3 style={{ fontSize: "14px", marginBottom: "12px", fontWeight: 600 }}>添加空专题 (Topic)</h3>
-              <div className="field" style={{ marginBottom: "8px" }}>
-                <select
-                  value={selectedSubjectIdForTopic}
-                  onChange={(e) => setSelectedSubjectIdForTopic(e.target.value)}
-                  style={{ width: "100%", padding: "6px 10px", fontSize: "13px", background: "var(--bg-main)", border: "1px solid var(--border-color)", borderRadius: "6px" }}
-                >
-                  <option value="">-- 选择所属分类 --</option>
-                  {tree?.groups?.map(g => <option key={g.id} value={g.id}>{g.title} ({g.id})</option>)}
-                </select>
-              </div>
-              <div className="field" style={{ marginBottom: "8px" }}>
-                <input value={newTopicId} onChange={(e) => setNewTopicId(e.target.value)} placeholder="专题ID (如 html-intro)" style={{ width: "100%", padding: "6px 10px", fontSize: "13px" }} />
-              </div>
-              <div className="field" style={{ marginBottom: "12px" }}>
-                <input value={newTopicTitle} onChange={(e) => setNewTopicTitle(e.target.value)} placeholder="专题名称 (如 HTML简介)" style={{ width: "100%", padding: "6px 10px", fontSize: "13px" }} />
-              </div>
-              <button
-                className="btn"
-                onClick={handleAddTopic}
-                disabled={addingTopic || !selectedSubjectIdForTopic || !newTopicId.trim() || !newTopicTitle.trim()}
-                style={{ width: "100%", justifyContent: "center" }}
-              >
-                {addingTopic ? "添加中..." : "添加空专题"}
-              </button>
-            </div>
-          </div>
-
-          <div className="hr" style={{ margin: "20px 0" }}></div>
-
-          <h2 style={{ fontSize: "16px", marginBottom: "12px", color: "var(--accent-blue)" }}>高级：GitHub 目录自动批量导入</h2>
-          <div className="field">
-            <div className="label">GitHub 目录 URL (例如：https://github.com/Snailclimb/JavaGuide/tree/main/docs/java)</div>
-            <input value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} placeholder="输入 GitHub Tree URL" />
-          </div>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end", marginBottom: "12px" }}>
-            <button
-              className="btn btn-primary"
-              onClick={handleBatchImport}
-              disabled={importing || !githubUrl.trim() || parsing}
-              style={{ opacity: importing || !githubUrl.trim() || parsing ? 0.7 : 1, background: "var(--accent-blue)" }}
-            >
-              {importing ? "正在批量导入..." : "开始批量自动导入"}
-            </button>
-          </div>
-
-          {importLogs.length > 0 && (
-            <div style={{ background: "var(--bg-main)", border: "1px solid var(--border-color)", borderRadius: "8px", padding: "12px", maxHeight: "300px", overflowY: "auto", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.5 }}>
-              {importLogs.map((log, i) => (
-                <div key={i} style={{ color: log.includes("❌") ? "var(--accent-orange)" : "var(--text-dark)" }}>{log}</div>
-              ))}
-              {importing && <div style={{ color: "var(--accent-blue)", marginTop: "8px" }}>加载中...</div>}
-            </div>
-          )}
-
-          {summary?.topic && !importing ? <div className="notice" style={{ marginTop: "12px" }}>主题：{summary.topic}</div> : null}
-
-          <div className="hr" style={{ margin: "20px 0" }}></div>
-
-          <h2 style={{ fontSize: "16px", marginBottom: "12px", color: "var(--text-dark)", fontFamily: "var(--font-heading)" }}>已录入内容（大纲视图）</h2>
-          {!tree || !tree.groups || tree.groups.length === 0 ? (
-            <div className="notice">该知识库下暂无内容，请通过上方功能进行录入。</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              {tree.groups.map((group) => (
-                <div key={group.id} style={{ background: "var(--bg-subtle)", padding: "16px", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
-                  <h3 style={{ fontSize: "15px", marginBottom: "12px", fontWeight: 600, color: "var(--text-dark)" }}>{group.title}</h3>
-                  {group.children && group.children.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {group.children.map((child) => (
-                        <div key={child.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--bg-main)", padding: "8px 12px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.05)" }}>
-                          <div style={{ fontSize: "14px", color: "var(--text-dark)" }}>{child.title}</div>
-                          <button
-                            className="btn"
-                            style={{ padding: "4px 8px", fontSize: "12px", color: "var(--accent-orange)", background: "rgba(217,119,87,0.1)", border: "none" }}
-                            onClick={() => handleTopicDelete(group.id, child.id, child.title)}
-                          >
-                            删除
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-muted" style={{ fontSize: "13px" }}>无专题</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+  if (loading) {
+    return (
+      <div className="container" style={{ paddingTop: "2rem" }}>
+        <div className="flex items-center justify-center" style={{ minHeight: "40vh" }}>
+          <div className="spinner" />
         </div>
       </div>
-    </div>
+    );
+  }
+
+  if (!detail?.bank) {
+    return (
+      <section className="minimal-admin-learning">
+        <div className="minimal-admin-learning__shell">
+          <div className="minimal-admin-learning__alert">题库不存在或已被删除。</div>
+          <Link className="btn btn-outline" href="/admin/learning">
+            返回后台首页
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="minimal-admin-learning minimal-admin-learning-detail">
+      <div className="minimal-admin-learning__shell">
+        <div className="minimal-admin-learning-detail__title">
+          <div>
+            <Link className="minimal-admin-learning-detail__back" href="/admin/learning">
+              返回学习中心后台
+            </Link>
+            <h1>{detail.bank.name}</h1>
+            <p className="minimal-admin-learning-detail__description">{detail.bank.description || "暂无题库说明"}</p>
+          </div>
+          <div className="minimal-admin-learning__bank-actions">
+            {detail.bank.defaultQuestionPath ? (
+              <Link className="btn btn-outline" href={detail.bank.defaultQuestionPath}>
+                打开首篇文档
+              </Link>
+            ) : null}
+            <button className="btn btn-outline" type="button" disabled={refreshing} onClick={() => void refreshDetail()}>
+              {refreshing ? "刷新中..." : "刷新"}
+            </button>
+            <button className="btn btn-outline" type="button" disabled={auditing} onClick={() => void handleRunQualityAudit()}>
+              {auditing ? "抽检中..." : "运行 AI 抽检"}
+            </button>
+            <button className="minimal-admin-learning__delete" type="button" disabled={deleting} onClick={() => void handleDeleteBank()}>
+              {deleting ? "删除中..." : "删除题库"}
+            </button>
+          </div>
+        </div>
+
+        {error ? <div className="minimal-admin-learning__alert">{error}</div> : null}
+        {auditSummary ? (
+          <div className="minimal-admin-learning__alert">
+            AI 抽检完成：共 {auditSummary.total} 篇，建议直接通过 {auditSummary.published} 篇，建议人工复核 {auditSummary.review} 篇，建议阻断 {auditSummary.blocked} 篇。
+          </div>
+        ) : null}
+
+        <section className="minimal-admin-learning__top">
+          <article className="minimal-admin-learning__panel">
+            <div className="minimal-admin-learning__panel-head">
+              <h2>章节目录</h2>
+              <span>{categories.length} 个章节</span>
+            </div>
+            <div className="minimal-admin-learning-detail__category-list">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`minimal-admin-learning-detail__category ${categoryFilter === category.id ? "is-active" : ""}`}
+                  onClick={() => setCategoryFilter((current) => (current === category.id ? "" : category.id))}
+                >
+                  <strong>{category.name}</strong>
+                  <span>{category.questionCount} 篇文档</span>
+                </button>
+              ))}
+            </div>
+          </article>
+
+          <article className="minimal-admin-learning__panel">
+            <div className="minimal-admin-learning__panel-head">
+              <h2>筛选条件</h2>
+              <span>从文档维度筛选当前题库内容</span>
+            </div>
+            <div className="minimal-admin-learning-detail__filters">
+              <select value={difficultyFilter} onChange={(event) => setDifficultyFilter(event.target.value as "" | QuestionDifficulty)}>
+                <option value="">全部难度</option>
+                <option value="easy">简单</option>
+                <option value="medium">中等</option>
+                <option value="hard">困难</option>
+              </select>
+              <select value={frequencyFilter} onChange={(event) => setFrequencyFilter(event.target.value as "" | InterviewFrequency)}>
+                <option value="">全部频率</option>
+                <option value="high">高频</option>
+                <option value="medium">常规</option>
+                <option value="low">低频</option>
+              </select>
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={() => {
+                  setDifficultyFilter("");
+                  setFrequencyFilter("");
+                  setCategoryFilter("");
+                }}
+              >
+                清空筛选
+              </button>
+            </div>
+            <div className="minimal-admin-learning__summary">
+              <span>{detail.bank.categoryCount} 个章节</span>
+              <span>{detail.bank.questionCount} 篇文档</span>
+              <span>{reviewTasks.length} 个审核任务</span>
+              <span>{aiTasks.length} 个 AI 任务</span>
+            </div>
+          </article>
+        </section>
+
+        <section className="minimal-admin-learning__panel">
+          <div className="minimal-admin-learning__panel-head">
+            <h2>文档列表</h2>
+            <span>{filteredDocuments.length} 篇</span>
+          </div>
+          {filteredDocuments.length === 0 ? (
+            <div className="minimal-admin-learning__empty">当前筛选条件下没有文档。</div>
+          ) : (
+            <div className="minimal-admin-learning-detail__question-list">
+              {filteredDocuments.map((document) => (
+                <article key={document.id} className="minimal-admin-learning-detail__question">
+                  <div className="minimal-admin-learning-detail__question-head">
+                    <strong>{document.title}</strong>
+                    <div className="minimal-admin-learning-detail__actions">
+                      <span>{QUESTION_DIFFICULTY_LABEL[document.difficulty]}</span>
+                      <span>{INTERVIEW_FREQUENCY_LABEL[document.interviewFrequency]}</span>
+                      <span>{document.status}</span>
+                    </div>
+                  </div>
+                  <p>{document.summary || "暂无摘要"}</p>
+                  <div className="minimal-admin-learning-detail__question-meta">
+                    <span>{document.categoryName}</span>
+                    <span>V{document.latestVersion}</span>
+                    <span>{document.sourceCount} 个来源</span>
+                    <span>{document.qualityScore ? `质检 ${document.qualityScore}` : "待质检"}</span>
+                    <span>{formatTime(document.updatedAt)}</span>
+                  </div>
+                  {document.tags.length > 0 ? (
+                    <div className="minimal-admin-learning-detail__question-tags">
+                      {document.tags.map((tag) => (
+                        <span key={`${document.id}-${tag}`}>{tag}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {document.latestReview ? (
+                    <div className="minimal-admin-learning__run-meta">
+                      <span>{document.latestReview.reviewType}</span>
+                      <span>{document.latestReview.status}</span>
+                      <span>{formatTime(document.latestReview.updatedAt)}</span>
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="minimal-admin-learning__section-grid">
+          <article className="minimal-admin-learning__panel">
+            <div className="minimal-admin-learning__panel-head">
+              <h2>审核任务</h2>
+              <span>{reviewTasks.length} 条</span>
+            </div>
+            {reviewTasks.length === 0 ? (
+              <div className="minimal-admin-learning__empty">当前没有审核任务。</div>
+            ) : (
+              <div className="minimal-admin-learning__doc-list">
+                {reviewTasks.map((task) => (
+                  <article key={task.id} className="minimal-admin-learning__doc">
+                    <div className="minimal-admin-learning__doc-head">
+                      <strong>{task.documentTitle}</strong>
+                      <span>{task.status}</span>
+                    </div>
+                    <div className="minimal-admin-learning__run-meta">
+                      <span>{task.reviewType}</span>
+                      <span>{formatTime(task.updatedAt)}</span>
+                    </div>
+                    {task.comment ? <p>{task.comment}</p> : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </article>
+
+          <article className="minimal-admin-learning__panel">
+            <div className="minimal-admin-learning__panel-head">
+              <h2>AI 任务</h2>
+              <span>{aiTasks.length} 条</span>
+            </div>
+            {aiTasks.length === 0 ? (
+              <div className="minimal-admin-learning__empty">当前没有 AI 任务。</div>
+            ) : (
+              <div className="minimal-admin-learning__doc-list">
+                {aiTasks.map((task) => (
+                  <article key={task.id} className="minimal-admin-learning__doc">
+                    <div className="minimal-admin-learning__doc-head">
+                      <strong>{task.taskType}</strong>
+                      <span>{task.status}</span>
+                    </div>
+                    <div className="minimal-admin-learning__run-meta">
+                      <span>{task.targetId || "未绑定目标"}</span>
+                      <span>{formatTime(task.finishedAt || task.createdAt)}</span>
+                    </div>
+                    {task.errorMessage ? <p>{task.errorMessage}</p> : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </article>
+        </section>
+      </div>
+    </section>
   );
 }

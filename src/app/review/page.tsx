@@ -2,6 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import { useAuthDialog } from "@/components/auth/AuthDialogProvider";
+import { getInterviewModeLabel, type InterviewMode } from "@/lib/interview/config";
 
 interface Session {
   id: string;
@@ -27,6 +30,8 @@ type Weakness = {
 
 export default function Review() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const { requestAuth } = useAuthDialog();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [allSessionsForWeaknesses, setAllSessionsForWeaknesses] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,12 +98,21 @@ export default function Review() {
   }, [debouncedSearch]);
 
   useEffect(() => {
+    if (!session?.user?.id) {
+      setSessions([]);
+      setAllSessionsForWeaknesses([]);
+      setIsLoading(false);
+      return;
+    }
     fetchSessions(debouncedSearch, page);
-  }, [debouncedSearch, page]);
+  }, [debouncedSearch, page, session?.user?.id]);
 
   useEffect(() => {
+    if (!session?.user?.id) {
+      return;
+    }
     fetchAllSessionsForWeaknesses();
-  }, []);
+  }, [session?.user?.id]);
 
   const executeDelete = async (id: string) => {
     try {
@@ -119,10 +133,9 @@ export default function Review() {
   };
 
   const getModeLabel = (mode: string) => {
-    if (mode === "video") return "视频面试";
-    if (mode === "voice") return "语音面试";
-    if (mode === "text") return "文字面试";
-    return "综合面试";
+    const normalizedMode: InterviewMode =
+      mode === "realtime" ? "realtime" : mode === "targeted" ? "targeted" : "text";
+    return getInterviewModeLabel(normalizedMode);
   };
 
   const weaknesses = useMemo(() => {
@@ -176,6 +189,61 @@ export default function Review() {
 
   const totalWeaknessPages = Math.ceil(weaknesses.length / WEAKNESS_LIMIT);
   const paginatedWeaknesses = weaknesses.slice((weaknessPage - 1) * WEAKNESS_LIMIT, weaknessPage * WEAKNESS_LIMIT);
+
+  if (!session?.user?.id) {
+    return (
+      <section
+        id="view-review"
+        className="view active"
+        style={{
+          backgroundColor: colorLight,
+          color: colorDark,
+          minHeight: "70vh",
+          padding: "2rem 0",
+          fontFamily: fontBody
+        }}
+      >
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1rem", display: "grid", gap: "1.25rem" }}>
+          <div style={{ padding: "2.25rem", borderRadius: "28px", background: "white", border: `1px solid ${colorLightGray}`, boxShadow: "0 14px 30px rgba(20,20,19,0.05)" }}>
+            <h1 style={{ marginBottom: "0.8rem" }}>复盘中心</h1>
+            <p style={{ color: colorMidGray, maxWidth: "48ch", marginBottom: "1.5rem" }}>
+              这里会集中展示面试后的评分变化、常见薄弱项和后续训练建议，帮助你持续复盘和迭代。
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.5rem" }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() =>
+                  requestAuth({
+                    title: "登录后查看完整复盘",
+                    description: "登录成功后将回到复盘中心，并加载你的历史记录与完整报告。",
+                    callbackUrl: "/review"
+                  })
+                }
+              >
+                登录体验完整功能
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => router.push("/practice")}>
+                去做专项训练
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: "1rem 1.15rem",
+              borderRadius: "18px",
+              border: `1px solid ${colorLightGray}`,
+              background: "rgba(255,255,255,0.74)",
+              color: colorDark
+            }}
+          >
+            登录后可查看你自己的历史记录、薄弱维度和完整报告。
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="view-review" className="view active" style={{ 

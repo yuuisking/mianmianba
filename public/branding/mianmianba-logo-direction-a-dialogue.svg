@@ -1,0 +1,79 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="760" fill="#faf9f5"/>
+
+  <text x="72" y="88" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="38" font-weight="700">
+    Direction A · 对话人物版
+  </text>
+  <text x="72" y="124" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    强调“面对面面试”的场景感，最像真实产品品牌标识
+  </text>
+
+  <rect x="56" y="172" width="1088" height="252" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="88" y="218" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    Horizontal Logo
+  </text>
+
+  <g transform="translate(88 258)">
+    <rect x="0" y="0" width="124" height="124" rx="34" fill="#141413"/>
+    <circle cx="42" cy="44" r="12" fill="#faf9f5"/>
+    <rect x="26" y="61" width="32" height="27" rx="13.5" fill="#faf9f5"/>
+    <circle cx="82" cy="44" r="12" fill="#faf9f5"/>
+    <rect x="66" y="61" width="32" height="27" rx="13.5" fill="#faf9f5"/>
+    <rect x="56" y="34" width="12" height="55" rx="6" fill="#d97757"/>
+    <circle cx="62" cy="23" r="9" fill="#d97757"/>
+    <path d="M41 99C46.3333 104.333 53.3333 107 62 107C70.6667 107 77.6667 104.333 83 99" stroke="#788c5d" stroke-width="6" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(256 272)">
+    <text x="0" y="62" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="68" font-weight="700" letter-spacing="-1">
+      面面吧
+    </text>
+    <text x="4" y="110" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+      Talk. Practice. Interview.
+    </text>
+    <rect x="0" y="130" width="240" height="8" rx="4" fill="#e8e6dc"/>
+    <rect x="0" y="130" width="118" height="8" rx="4" fill="#d97757"/>
+  </g>
+
+  <rect x="56" y="456" width="344" height="236" rx="28" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="88" y="502" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    Favicon
+  </text>
+  <g transform="translate(132 550)">
+    <rect x="0" y="0" width="96" height="96" rx="26" fill="#141413"/>
+    <circle cx="32" cy="35" r="9.5" fill="#faf9f5"/>
+    <rect x="20" y="49" width="24" height="20" rx="10" fill="#faf9f5"/>
+    <circle cx="64" cy="35" r="9.5" fill="#faf9f5"/>
+    <rect x="52" y="49" width="24" height="20" rx="10" fill="#faf9f5"/>
+    <rect x="43" y="28" width="10" height="42" rx="5" fill="#d97757"/>
+    <circle cx="48" cy="20" r="7.5" fill="#d97757"/>
+  </g>
+
+  <rect x="428" y="456" width="344" height="236" rx="28" fill="#141413"/>
+  <text x="460" y="502" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    Reverse
+  </text>
+  <g transform="translate(504 550)">
+    <rect x="0" y="0" width="96" height="96" rx="26" fill="#faf9f5"/>
+    <circle cx="32" cy="35" r="9.5" fill="#141413"/>
+    <rect x="20" y="49" width="24" height="20" rx="10" fill="#141413"/>
+    <circle cx="64" cy="35" r="9.5" fill="#141413"/>
+    <rect x="52" y="49" width="24" height="20" rx="10" fill="#141413"/>
+    <rect x="43" y="28" width="10" height="42" rx="5" fill="#d97757"/>
+    <circle cx="48" cy="20" r="7.5" fill="#d97757"/>
+  </g>
+
+  <rect x="800" y="456" width="344" height="236" rx="28" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="832" y="502" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="28" font-weight="700">
+    特点
+  </text>
+  <text x="832" y="552" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    最容易让人联想到“真实面试”
+  </text>
+  <text x="832" y="590" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    适合首页导航、登录页、品牌主视觉
+  </text>
+  <text x="832" y="628" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    风格偏稳重、可信、产品化
+  </text>
+</svg>

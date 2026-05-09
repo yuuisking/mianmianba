@@ -1,0 +1,74 @@
+<svg width="1200" height="760" viewBox="0 0 1200 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="760" fill="#faf9f5"/>
+
+  <text x="72" y="88" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="38" font-weight="700">
+    Direction B Light · 中文印章版
+  </text>
+  <text x="72" y="124" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    去掉黑底，改成浅底印章气质，更轻、更耐看
+  </text>
+
+  <rect x="56" y="172" width="1088" height="252" rx="32" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="88" y="218" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    Horizontal Logo
+  </text>
+
+  <g transform="translate(88 252)">
+    <rect x="0" y="0" width="136" height="136" rx="34" fill="#fffdf8" stroke="#141413" stroke-width="8"/>
+    <rect x="28" y="26" width="80" height="80" rx="18" stroke="#141413" stroke-width="10"/>
+    <rect x="44" y="42" width="48" height="48" rx="10" stroke="#d97757" stroke-width="8"/>
+    <path d="M18 116H118" stroke="#788c5d" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="116" cy="116" r="10" fill="#6a9bcc"/>
+  </g>
+
+  <g transform="translate(264 272)">
+    <text x="0" y="62" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="68" font-weight="700" letter-spacing="-1">
+      面面吧
+    </text>
+    <text x="4" y="110" fill="#b0aea5" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="24">
+      Chinese Mark / Light Seal
+    </text>
+    <rect x="0" y="130" width="280" height="8" rx="4" fill="#e8e6dc"/>
+    <rect x="0" y="130" width="102" height="8" rx="4" fill="#d97757"/>
+  </g>
+
+  <rect x="56" y="456" width="344" height="236" rx="28" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="88" y="502" fill="#b0aea5" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="18" font-weight="600">
+    App Icon
+  </text>
+  <g transform="translate(134 548)">
+    <rect x="0" y="0" width="100" height="100" rx="26" fill="#fffdf8" stroke="#141413" stroke-width="6"/>
+    <rect x="21" y="20" width="58" height="58" rx="14" stroke="#141413" stroke-width="9"/>
+    <rect x="33" y="32" width="34" height="34" rx="8" stroke="#d97757" stroke-width="7"/>
+    <path d="M14 84H84" stroke="#788c5d" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="85" cy="84" r="8.5" fill="#6a9bcc"/>
+  </g>
+
+  <rect x="428" y="456" width="344" height="236" rx="28" fill="#f3f0e8"/>
+  <text x="460" y="502" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="28" font-weight="700">
+    适合
+  </text>
+  <text x="460" y="552" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    更温和的首页导航
+  </text>
+  <text x="460" y="590" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    不想太重、不想像黑色徽章时
+  </text>
+  <text x="460" y="628" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    仍保留中文原创感和品牌感
+  </text>
+
+  <rect x="800" y="456" width="344" height="236" rx="28" fill="#fffdf8" stroke="#e8e6dc" stroke-width="2"/>
+  <text x="832" y="502" fill="#141413" font-family="Poppins, Arial, PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif" font-size="28" font-weight="700">
+    关键词
+  </text>
+  <text x="832" y="552" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    轻品牌感
+  </text>
+  <text x="832" y="590" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    中文印记
+  </text>
+  <text x="832" y="628" fill="#141413" font-family="Lora, Georgia, PingFang SC, Hiragino Sans GB, Microsoft YaHei, serif" font-size="22">
+    柔和、克制、耐看
+  </text>
+</svg>

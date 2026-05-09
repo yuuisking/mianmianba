@@ -1,221 +1,179 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useAuthDialog } from "@/components/auth/AuthDialogProvider";
+import { isAdminRole } from "@/lib/permissions";
 
+const dashboardCards = [
+  {
+    title: "模拟面试",
+    description: "上传简历与岗位描述，生成画像后进入完整面试链路。",
+    href: "/setup",
+    accent: "var(--accent-orange)"
+  },
+  {
+    title: "专项训练",
+    description: "一句话指定训练主题，直接进入定点突破模式。",
+    href: "/practice",
+    accent: "var(--accent-blue)"
+  },
+  {
+    title: "复盘中心",
+    description: "查看历史记录、维度评分与下一步训练建议。",
+    href: "/review",
+    accent: "var(--accent-green)"
+  }
+] as const;
+
+/**
+ * 渲染用户登录后的控制台入口，并根据角色展示后台管理卡片。
+ * @returns 控制台页面组件。
+ */
 export default function Dashboard() {
   const router = useRouter();
   const { data: session } = useSession();
-  const isAdmin = session?.user?.email === "admin@resumer.com";
+  const { requestAuth } = useAuthDialog();
+  const isAdmin = isAdminRole(session?.user?.role);
+  const isAuthenticated = Boolean(session?.user?.id);
+
+  /**
+   * 统一处理工作台卡片点击，未登录时先要求完成认证。
+   * @param href 目标地址。
+   */
+  function handleCardClick(href: string): void {
+    if (isAuthenticated) {
+      router.push(href);
+      return;
+    }
+
+    requestAuth({
+      title: "登录后继续使用",
+      description: "登录后即可进入对应模块，并保存你的练习与复盘记录。",
+      callbackUrl: href,
+      onSuccess: () => router.push(href)
+    });
+  }
 
   return (
-    <section id="view-dashboard" className="view active" style={{ 
-      marginTop: "4rem",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "60vh",
-      textAlign: "center"
-    }}>
-      <h1 style={{ 
-        fontSize: "3.5rem", 
-        marginBottom: "1rem", 
-        fontFamily: "var(--font-heading)", 
-        color: "var(--text-dark)",
-        letterSpacing: "-0.02em"
-      }}>
-        你好，开发者
-      </h1>
-      <p className="text-muted" style={{ 
-        fontSize: "1.2rem", 
-        marginBottom: "4rem", 
-        fontFamily: "var(--font-ui)" 
-      }}>
-        今天想针对哪个岗位进行训练？
-      </p>
-      
-      <div style={{ display: "flex", gap: "2rem", justifyContent: "center", flexWrap: "wrap", maxWidth: "1000px" }}>
-        {/* 常规面试 */}
-        <div 
-          onClick={() => router.push("/setup")}
-          style={{
-            padding: "2.5rem 2rem",
-            backgroundColor: "var(--bg-surface)",
-            border: "1px solid var(--border-color)",
-            borderRadius: "24px",
-            cursor: "pointer",
-            transition: "all 0.3s ease",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "1.2rem",
-            width: "280px"
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--accent-orange)";
-            e.currentTarget.style.boxShadow = "0 12px 32px rgba(217, 119, 87, 0.12)";
-            e.currentTarget.style.transform = "translateY(-6px)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-color)";
-            e.currentTarget.style.boxShadow = "none";
-            e.currentTarget.style.transform = "none";
-          }}
-        >
-          <div style={{ 
-            width: "72px", 
-            height: "72px", 
-            borderRadius: "50%", 
-            backgroundColor: "rgba(217, 119, 87, 0.1)", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center",
-            fontSize: "2.2rem"
-          }}>
-            🎯
-          </div>
-          <h3 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: "1.4rem", color: "var(--text-dark)" }}>模拟面试</h3>
-          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.95rem", fontFamily: "var(--font-ui)", lineHeight: 1.5 }}>
-            配置岗位方向与难度<br/>进行全流程实战模拟面试
-          </p>
-        </div>
-
-        {/* 专项训练 */}
-        <div 
-          onClick={() => router.push("/practice")}
-          style={{
-            padding: "2.5rem 2rem",
-            backgroundColor: "var(--bg-surface)",
-            border: "1px solid var(--border-color)",
-            borderRadius: "24px",
-            cursor: "pointer",
-            transition: "all 0.3s ease",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "1.2rem",
-            width: "280px"
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "#6a9bcc";
-            e.currentTarget.style.boxShadow = "0 12px 32px rgba(106, 155, 204, 0.12)";
-            e.currentTarget.style.transform = "translateY(-6px)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-color)";
-            e.currentTarget.style.boxShadow = "none";
-            e.currentTarget.style.transform = "none";
-          }}
-        >
-          <div style={{ 
-            width: "72px", 
-            height: "72px", 
-            borderRadius: "50%", 
-            backgroundColor: "rgba(106, 155, 204, 0.1)", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center",
-            fontSize: "2.2rem"
-          }}>
-            ⚡
-          </div>
-          <h3 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: "1.4rem", color: "var(--text-dark)" }}>专项训练</h3>
-          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.95rem", fontFamily: "var(--font-ui)", lineHeight: 1.5 }}>
-            一句话开启极简对话<br/>针对特定知识点进行强化训练
-          </p>
-        </div>
-
-        {/* 复盘中心 */}
-        <div 
-          onClick={() => router.push("/review")}
-          style={{
-            padding: "2.5rem 2rem",
-            backgroundColor: "var(--bg-surface)",
-            border: "1px solid var(--border-color)",
-            borderRadius: "24px",
-            cursor: "pointer",
-            transition: "all 0.3s ease",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "1.2rem",
-            width: "280px"
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "#788c5d";
-            e.currentTarget.style.boxShadow = "0 12px 32px rgba(120, 140, 93, 0.12)";
-            e.currentTarget.style.transform = "translateY(-6px)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-color)";
-            e.currentTarget.style.boxShadow = "none";
-            e.currentTarget.style.transform = "none";
-          }}
-        >
-          <div style={{ 
-            width: "72px", 
-            height: "72px", 
-            borderRadius: "50%", 
-            backgroundColor: "rgba(120, 140, 93, 0.1)", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center",
-            fontSize: "2.2rem"
-          }}>
-            📈
-          </div>
-          <h3 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: "1.4rem", color: "var(--text-dark)" }}>复盘中心</h3>
-          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.95rem", fontFamily: "var(--font-ui)", lineHeight: 1.5 }}>
-            查看完整历史记录与错题本<br/>打通学习闭环攻克薄弱项
-          </p>
-        </div>
-        {/* 知识库管理 */}
-        {isAdmin && (
+    <section
+      id="view-dashboard"
+      className="view active"
+      style={{
+        marginTop: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "2rem"
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)",
+          gap: "1.5rem"
+        }}
+      >
         <div
-          onClick={() => router.push("/admin/knowledge")}
           style={{
-            padding: "2.5rem 2rem",
-            backgroundColor: "var(--bg-surface)",
-            border: "1px solid var(--border-color)",
-            borderRadius: "24px",
-            cursor: "pointer",
-            transition: "all 0.3s ease",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: "1.2rem",
-            width: "280px"
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "#9c27b0";
-            e.currentTarget.style.boxShadow = "0 12px 32px rgba(156, 39, 176, 0.12)";
-            e.currentTarget.style.transform = "translateY(-6px)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-color)";
-            e.currentTarget.style.boxShadow = "none";
-            e.currentTarget.style.transform = "none";
+            padding: "2.5rem",
+            borderRadius: "30px",
+            border: "1px solid rgba(20, 20, 19, 0.08)",
+            background:
+              "radial-gradient(500px 260px at 6% 8%, rgba(217, 119, 87, 0.18), transparent 62%), radial-gradient(420px 220px at 92% 12%, rgba(106, 155, 204, 0.14), transparent 56%), rgba(255, 255, 255, 0.86)"
           }}
         >
-          <div style={{ 
-            width: "72px", 
-            height: "72px", 
-            borderRadius: "50%", 
-            backgroundColor: "rgba(156, 39, 176, 0.1)", 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "center",
-            fontSize: "2.2rem"
-          }}>
-            📚
-          </div>
-          <h3 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: "1.4rem", color: "var(--text-dark)" }}>知识库</h3>
-          <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.95rem", fontFamily: "var(--font-ui)", lineHeight: 1.5 }}>
-            管理并录入前沿题库<br/>让面试官实时学习最新知识
+          <span className="tag tag-primary">{isAuthenticated ? "My Workspace" : "面面吧 Workspace"}</span>
+          <h1 style={{ marginTop: "1rem", marginBottom: "0.75rem" }}>
+            {isAuthenticated
+              ? `你好，${session?.user?.nickname || session?.user?.name || "候选人"}`
+              : "你好，这里是你的练习工作台。"}
+          </h1>
+          <p style={{ maxWidth: "56ch", marginBottom: "1.5rem", color: "rgba(20, 20, 19, 0.72)" }}>
+            {isAuthenticated
+              ? "继续发起模拟面试、专项训练、查看复盘记录，或进入个人资料页维护你的账号信息。"
+              : "从这里进入模拟面试、专项训练和复盘中心，登录后可以保留你的练习记录与报告结果。"}
           </p>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <button type="button" className="btn btn-primary" onClick={() => handleCardClick("/setup")}>
+              开始模拟面试
+            </button>
+            <Link href="/home" className="btn btn-secondary">
+              回到公开首页
+            </Link>
+          </div>
         </div>
-        )}
+
+        <div
+          style={{
+            padding: "1.5rem",
+            borderRadius: "30px",
+            background: "rgba(20, 20, 19, 0.92)",
+            color: "white",
+            display: "grid",
+            gap: "0.9rem"
+          }}
+        >
+          <h3 style={{ color: "white", marginBottom: 0 }}>工作台概览</h3>
+          <p style={{ color: "rgba(255,255,255,0.72)", fontSize: "0.98rem", marginBottom: 0 }}>
+            模拟面试、专项训练、复盘查看和个人资料都从这里进入，保持同一套简洁的使用体验。
+          </p>
+          <div style={{ display: "grid", gap: "0.7rem" }}>
+            <div className="tag" style={{ background: "rgba(255,255,255,0.08)", color: "white" }}>
+              模拟面试与岗位画像
+            </div>
+            <div className="tag" style={{ background: "rgba(255,255,255,0.08)", color: "white" }}>
+              专项训练与复盘查看
+            </div>
+            {isAdmin && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ width: "fit-content", color: "white", borderColor: "rgba(255,255,255,0.28)" }}
+                onClick={() => router.push("/admin/users")}
+              >
+                进入会员管理
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
+        {dashboardCards.map((card) => (
+          <button
+            key={card.title}
+            type="button"
+            onClick={() => handleCardClick(card.href)}
+            style={{
+              textAlign: "left",
+              padding: "1.6rem",
+              borderRadius: "26px",
+              border: "1px solid rgba(20, 20, 19, 0.08)",
+              background: "rgba(255, 255, 255, 0.88)",
+              cursor: "pointer",
+              boxShadow: "0 16px 36px rgba(20, 20, 19, 0.05)"
+            }}
+          >
+            <span
+              style={{
+                width: "40px",
+                height: "4px",
+                display: "block",
+                borderRadius: "999px",
+                background: card.accent,
+                marginBottom: "1rem"
+              }}
+            />
+            <h3 style={{ marginBottom: "0.55rem" }}>{card.title}</h3>
+            <p style={{ fontSize: "0.96rem", color: "rgba(20, 20, 19, 0.7)", marginBottom: "1rem" }}>
+              {card.description}
+            </p>
+            <span style={{ fontWeight: 700, color: "var(--text-dark)" }}>
+              {isAuthenticated ? "立即进入" : "登录后继续"} →
+            </span>
+          </button>
+        ))}
       </div>
     </section>
   );

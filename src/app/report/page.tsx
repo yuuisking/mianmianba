@@ -1,10 +1,14 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef, Suspense } from "react";
+import { useAuthDialog } from "@/components/auth/AuthDialogProvider";
+import { getInterviewModeLabel, type InterviewMode } from "@/lib/interview/config";
 
 type ReportData = {
-  score: number;
+  noEffectiveInterview?: boolean;
+  score: number | null;
   highlights: string[];
   risks: string[];
   evidence: string[];
@@ -16,6 +20,8 @@ type ReportData = {
 function ReportContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const { requestAuth } = useAuthDialog();
   const sessionId = searchParams.get("sessionId");
 
   const [report, setReport] = useState<ReportData | null>(null);
@@ -23,7 +29,25 @@ function ReportContent() {
   const [progress, setProgress] = useState(0);
   const isGenerating = useRef(false);
 
+  /**
+   * 将服务端返回的模式字符串归一化为前端可展示的面试模式。
+   * @param mode 服务端返回的模式值。
+   * @returns 受控的面试模式枚举。
+   */
+  const normalizeMode = (mode: string): InterviewMode => {
+    if (mode === "realtime" || mode === "targeted") {
+      return mode;
+    }
+
+    return "text";
+  };
+
   useEffect(() => {
+    if (!session?.user?.id) {
+      setLoading(false);
+      return;
+    }
+
     async function loadOrGenerateReport() {
       // 1. If we are viewing an existing report from dashboard
       if (sessionId) {
@@ -34,22 +58,37 @@ function ReportContent() {
             const sessionData = json.data;
             if (sessionData && sessionData.report) {
               setReport({
-                score: sessionData.score || 0,
+                score: sessionData.score ?? null,
                 highlights: JSON.parse(sessionData.report.highlights || "[]"),
                 risks: JSON.parse(sessionData.report.risks || "[]"),
                 evidence: JSON.parse(sessionData.report.evidence || "[]"),
                 nextSteps: JSON.parse(sessionData.report.nextSteps || "[]"),
                 dimensions: JSON.parse(sessionData.report.dimensions || "[]"),
-                metadata: { role: sessionData.mode, questions: Math.floor((sessionData.messages?.length || 0) / 2) }
+                metadata: {
+                  role: getInterviewModeLabel(normalizeMode(sessionData.mode)),
+                  questions: Math.floor((sessionData.messages?.length || 0) / 2)
+                }
               });
+              setLoading(false);
+              return;
+            } else if (sessionData) {
+              sessionStorage.setItem("interviewHistory", JSON.stringify({
+                sessionId: sessionData.id,
+                mode: sessionData.mode,
+                messages: (sessionData.messages || []).map((message: { role: string; content: string }) => ({
+                  role: message.role === "assistant" ? "ai" : "user",
+                  content: String(message.content || "").split("\n"),
+                  time: "",
+                  tag: ""
+                })),
+                elapsedTime: 0,
+                questionCount: Math.floor((sessionData.messages?.length || 0) / 2)
+              }));
             }
           }
         } catch (e) {
           console.error("Failed to fetch session", e);
-        } finally {
-          setLoading(false);
         }
-        return;
       }
 
       // 2. Generating a new report after interview
@@ -84,7 +123,7 @@ function ReportContent() {
         const res = await fetch("/api/reports/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ history, profile })
+          body: JSON.stringify({ history, profile, sessionId: history.sessionId || sessionId })
         });
 
         if (res.ok) {
@@ -94,7 +133,7 @@ function ReportContent() {
           setTimeout(() => {
             setReport(data);
             sessionStorage.setItem("latestReport", JSON.stringify(data));
-            sessionStorage.removeItem("interviewHistory"); // Crucial: clear history to prevent duplicate API calls on refresh
+            sessionStorage.removeItem("interviewHistory");
             setLoading(false);
           }, 500);
         } else {
@@ -110,7 +149,57 @@ function ReportContent() {
     }
 
     loadOrGenerateReport();
-  }, [sessionId]);
+  }, [session?.user?.id, sessionId]);
+
+  if (!session?.user?.id) {
+    return (
+      <section
+        id="view-report"
+        className="view active"
+        style={{
+          minHeight: "70vh",
+          display: "grid",
+          placeItems: "center"
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "840px",
+            width: "100%",
+            padding: "2.4rem",
+            borderRadius: "28px",
+            background: "rgba(255,255,255,0.92)",
+            border: "1px solid rgba(20,20,19,0.08)",
+            boxShadow: "0 18px 40px rgba(20,20,19,0.06)"
+          }}
+        >
+          <span className="tag tag-primary">面面吧 Report</span>
+          <h1 style={{ marginTop: "1rem" }}>登录后查看你的面试报告。</h1>
+          <p style={{ color: "rgba(20, 20, 19, 0.72)", maxWidth: "54ch" }}>
+            报告将展示亮点、风险、佐证与下一步训练建议。
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.5rem" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() =>
+                requestAuth({
+                  title: "登录后查看报告",
+                  description: "继续查看当前面试的复盘结果。",
+                  callbackUrl: sessionId ? `/report?sessionId=${sessionId}` : "/report"
+                })
+              }
+            >
+              登录查看报告
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => router.push("/home")}>
+              返回首页
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (loading) {
     return (
@@ -145,6 +234,71 @@ function ReportContent() {
     );
   }
 
+  if (report.noEffectiveInterview) {
+    return (
+      <section
+        id="view-report"
+        className="view active"
+        style={{
+          padding: "3rem 1.5rem",
+          backgroundColor: "var(--bg-main)",
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center"
+        }}
+      >
+        <div
+          style={{
+            width: "min(92vw, 820px)",
+            padding: "2.4rem",
+            borderRadius: "28px",
+            backgroundColor: "rgba(255,255,255,0.95)",
+            border: "1px solid rgba(20,20,19,0.08)",
+            boxShadow: "0 20px 48px rgba(20,20,19,0.08)"
+          }}
+        >
+          <span className="tag tag-primary" style={{ margin: 0 }}>
+            本次未形成有效面试
+          </span>
+          <h1 style={{ marginTop: "1rem", marginBottom: "0.75rem" }}>
+            本次不生成评分与正式报告
+          </h1>
+          <p style={{ color: "rgba(20,20,19,0.72)", lineHeight: 1.7, maxWidth: "56ch" }}>
+            你这次几乎没有形成有效问答内容，所以系统不会伪造分数，也不会生成正式评估报告。重新开始一场有效面试后，再来查看复盘结果会更准确。
+          </p>
+          <div
+            style={{
+              marginTop: "1.5rem",
+              padding: "1rem 1.1rem",
+              borderRadius: "18px",
+              backgroundColor: "rgba(106, 155, 204, 0.06)",
+              border: "1px solid rgba(106, 155, 204, 0.14)",
+              color: "var(--text-dark)"
+            }}
+          >
+            当前模式：{report.metadata?.role || "本场面试"}，有效问答轮次：{report.metadata?.questions || 0}
+          </div>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.75rem" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => router.push("/setup")}
+            >
+              重新开始面试
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => router.push("/home")}
+            >
+              返回首页
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="view-report" className="view active" style={{ padding: "3rem 1.5rem", backgroundColor: "var(--bg-main)", minHeight: "100vh" }}>
       <div style={{ maxWidth: "1000px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "2.5rem" }}>
@@ -166,7 +320,7 @@ function ReportContent() {
           <div style={{ textAlign: "right", backgroundColor: "var(--bg-surface)", padding: "1.25rem 2rem", borderRadius: "16px", border: "1px solid var(--border-color)", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
             <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "0.5rem", fontFamily: "var(--font-ui)" }}>综合岗位匹配度</div>
             <div style={{ fontSize: "3rem", fontWeight: 700, color: "var(--accent-orange)", lineHeight: 1, fontFamily: "var(--font-heading)" }}>
-              {report.score || 0}<span style={{ fontSize: "1.2rem", color: "var(--text-muted)", marginLeft: "4px" }}>/100</span>
+              {report.score ?? 0}<span style={{ fontSize: "1.2rem", color: "var(--text-muted)", marginLeft: "4px" }}>/100</span>
             </div>
           </div>
         </div>
