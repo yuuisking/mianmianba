@@ -69,7 +69,7 @@ async function toggleCam() {
       state.video.stream = stream;
       $("#video").srcObject = stream;
       $("#video").play().catch(() => {});
-    } catch (e) {
+    } catch {
       state.camOn = false;
       alert("无法打开摄像头（原型）。请检查浏览器权限。");
     }
@@ -116,7 +116,7 @@ async function toggleMic() {
       state.audio.source = source;
 
       animateWaveform();
-    } catch (e) {
+    } catch {
       state.micOn = false;
       alert("无法打开麦克风（原型）。请检查浏览器权限。");
       stopMicGraph();

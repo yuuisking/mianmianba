@@ -55,6 +55,7 @@ tmp/local-postgres/
 /test.jsonl
 /杨宇-四年工作经验-高级Java研发工程师.pdf
 /验收问题.docx
+reference/
 
 # vercel
 .vercel

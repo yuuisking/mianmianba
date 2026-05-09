@@ -16,6 +16,7 @@
 - 应用服务：`systemctl status resumer`
 - 反向代理：`systemctl status nginx`
 - 数据库：PostgreSQL（本机 127.0.0.1:5432，数据库名 `resumer_prod`，业务用户 `resumer`）
+- 登录状态：已恢复；2026-05-03 已修复 NextAuth `NO_SECRET`
 
 ## 运行态数据（需要一起同步，否则“上下文”会断）
 - 学习中心知识库：`data/learning-center.json`
@@ -60,3 +61,20 @@
 - `NEXTAUTH_SECRET`
 - `DEEPSEEK_API_KEY`
 - `CRON_SECRET`
+
+## 2026-05-03 登录故障修复记录
+- 用户反馈登录页点击“登录”后报错：`Server error / There is a problem with the server configuration`
+- 排查结论：
+  - NextAuth 配置读取 `process.env.NEXTAUTH_SECRET`
+  - 线上 `resumer.service` 原配置未加载 `/srv/resumer/.env` 和 `/srv/resumer/.env.local`
+  - 两份环境文件中的 `NEXTAUTH_SECRET` 还被写成了空字符串 `""`
+- 已执行修复：
+  - 更新 `/etc/systemd/system/resumer.service`
+  - 增加：
+    - `EnvironmentFile=-/srv/resumer/.env`
+    - `EnvironmentFile=-/srv/resumer/.env.local`
+  - 重新生成有效 `NEXTAUTH_SECRET`
+  - `systemctl daemon-reload && systemctl restart resumer`
+- 验证结果：
+  - `curl http://127.0.0.1:3000/api/auth/providers` 返回 `200 OK`
+  - 使用账号 `yangyudei163@163.com` 已成功登录并进入 `/dashboard`
