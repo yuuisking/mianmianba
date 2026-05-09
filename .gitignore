@@ -42,6 +42,19 @@ out.json
 prisma/dev.db
 data/learning-center.json
 dogfood-output/
+tmp/
+test-results/
+tmp/local-postgres/
+
+# local exported artifacts
+/test.pdf
+/test.md
+/test.txt
+/test2.md
+/test3.txt
+/test.jsonl
+/杨宇-四年工作经验-高级Java研发工程师.pdf
+/验收问题.docx
 
 # vercel
 .vercel
