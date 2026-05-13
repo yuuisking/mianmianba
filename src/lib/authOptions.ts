@@ -5,6 +5,46 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 
 /**
+ * 识别一个外部地址是否仍指向本地开发环境，避免生产环境继续回写到 `127.0.0.1`。
+ * @param value 候选基准地址。
+ * @returns 是否属于本地开发地址。
+ */
+function isLocalAuthBaseUrl(value: string): boolean {
+  return /127\.0\.0\.1|localhost/i.test(value);
+}
+
+/**
+ * 为 NextAuth 解析当前应使用的公网基准地址，优先采用显式环境变量，其次回退到 ECS 公网地址。
+ * @returns 适合写入 `NEXTAUTH_URL` 的绝对地址。
+ */
+function resolveNextAuthBaseUrl(): string | undefined {
+  const candidates = [
+    process.env.NEXTAUTH_URL,
+    process.env.AUTH_URL,
+    process.env.APP_URL,
+    process.env.PUBLIC_APP_URL,
+  ]
+    .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+    .map((value) => value.trim());
+
+  const publicCandidate = candidates.find((value) => !isLocalAuthBaseUrl(value));
+  if (publicCandidate) {
+    return publicCandidate;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return "http://47.95.233.109";
+  }
+
+  return candidates[0];
+}
+
+const resolvedNextAuthBaseUrl = resolveNextAuthBaseUrl();
+if (resolvedNextAuthBaseUrl) {
+  process.env.NEXTAUTH_URL = resolvedNextAuthBaseUrl;
+}
+
+/**
  * 规范化用户输入邮箱，避免因为空格或大小写导致同一账号匹配失败。
  * @param email 原始邮箱字符串。
  * @returns 清理后的邮箱地址。
@@ -30,6 +70,7 @@ function buildDisplayName(
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   providers: [
     CredentialsProvider({
       name: "Credentials",

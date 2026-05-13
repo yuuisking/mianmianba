@@ -150,7 +150,11 @@ run_remote_deploy() {
     tar -xzf '${remote_archive}' -C '${REMOTE_APP_DIR}'
     find '${REMOTE_APP_DIR}' -name '._*' -delete || true
     chown -R '${REMOTE_RUNTIME_USER}:${REMOTE_RUNTIME_USER}' '${REMOTE_APP_DIR}'
-    sudo -u '${REMOTE_RUNTIME_USER}' sh -lc 'cd \"${REMOTE_APP_DIR}\" && npx prisma generate'
+    if [ -x '${REMOTE_APP_DIR}/scripts/ops/install-judge-runtime.sh' ]; then
+      '${REMOTE_APP_DIR}/scripts/ops/install-judge-runtime.sh'
+    fi
+    sudo -u '${REMOTE_RUNTIME_USER}' sh -lc 'cd \"${REMOTE_APP_DIR}\" && npm ci --omit=dev'
+    sudo -u '${REMOTE_RUNTIME_USER}' sh -lc 'cd \"${REMOTE_APP_DIR}\" && set -a && [ -f ./.env ] && . ./.env || true && [ -f ./.env.local ] && . ./.env.local || true && set +a && npx prisma migrate deploy && npx prisma generate'
     PRISMA_ALIAS=\$(grep -Rho '@prisma/client-[a-z0-9]\\+' '${REMOTE_APP_DIR}/.next/server' '${REMOTE_APP_DIR}/.next/dev/server' 2>/dev/null | head -n 1 | sed 's#@prisma/##' || true)
     if [ -n \"\${PRISMA_ALIAS}\" ]; then
       mkdir -p '${REMOTE_APP_DIR}/node_modules/@prisma/\${PRISMA_ALIAS}'
@@ -168,6 +172,13 @@ EOF
 export * from '@prisma/client';
 EOF
       chown -R '${REMOTE_RUNTIME_USER}:${REMOTE_RUNTIME_USER}' '${REMOTE_APP_DIR}/node_modules/@prisma/\${PRISMA_ALIAS}'
+    fi
+    if [ -f '${REMOTE_APP_DIR}/deploy/judge-runner.service' ]; then
+      cp '${REMOTE_APP_DIR}/deploy/judge-runner.service' /etc/systemd/system/judge-runner.service
+      systemctl daemon-reload
+      systemctl enable judge-runner.service
+      systemctl restart judge-runner.service
+      systemctl is-active judge-runner.service
     fi
     systemctl restart '${REMOTE_SERVICE}'
     systemctl is-active '${REMOTE_SERVICE}'

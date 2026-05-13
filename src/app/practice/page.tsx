@@ -6,7 +6,6 @@ import { useSession } from "next-auth/react";
 import { useAuthDialog } from "@/components/auth/AuthDialogProvider";
 import {
   createInterviewLaunchId,
-  readStoredInterviewProfile,
   writeStoredInterviewProfile,
 } from "@/lib/interview/config";
 
@@ -23,20 +22,46 @@ function PracticeSetupContent() {
     const topic = searchParams.get("topic");
     const summary = searchParams.get("summary");
     const focus = searchParams.get("focus");
+    const issueName = searchParams.get("issueName");
+    const role = searchParams.get("role");
+    const company = searchParams.get("company");
+    const level = searchParams.get("level");
+    const goal = searchParams.get("goal");
 
-    if (!topic) {
+    if (topic) {
+      const segments = [`我想做专项训练，训练主题：${topic}`];
+      if (summary) {
+        segments.push(`当前文档摘要：${summary}`);
+      }
+      if (focus) {
+        segments.push(`希望重点追问：${focus}`);
+      }
+
+      return segments.join("；");
+    }
+
+    if (!issueName && !goal) {
       return "";
     }
 
-    const segments = [`我想做专项训练，训练主题：${topic}`];
-    if (summary) {
-      segments.push(`当前文档摘要：${summary}`);
+    const reviewSegments = ["我想做专项训练"];
+    if (role) {
+      reviewSegments.push(`目标岗位：${role}`);
     }
-    if (focus) {
-      segments.push(`希望重点追问：${focus}`);
+    if (company) {
+      reviewSegments.push(`目标公司：${company}`);
+    }
+    if (level) {
+      reviewSegments.push(`当前职级：${level}`);
+    }
+    if (issueName) {
+      reviewSegments.push(`当前要重点解决的问题：${issueName}`);
+    }
+    if (goal) {
+      reviewSegments.push(`训练目标：${goal}`);
     }
 
-    return segments.join("；");
+    return reviewSegments.join("；");
   });
   const [submitError, setSubmitError] = useState("");
   const [isResolvingRole, setIsResolvingRole] = useState(false);

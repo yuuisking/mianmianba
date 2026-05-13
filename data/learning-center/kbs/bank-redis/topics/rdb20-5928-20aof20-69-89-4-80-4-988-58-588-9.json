@@ -1,0 +1,323 @@
+{
+  "kbId": "bank-redis",
+  "topicId": "rdb20-5928-20aof20-69-89-4-80-4-988-58-588-9",
+  "subjectId": "2-68-81-4-985-58-96-4-88-9-98-58-794-8",
+  "updatedAt": "2026-05-09",
+  "content": {
+    "title": "RDB 和 AOF 有什么区别？",
+    "breadcrumb": [
+      "Redis题库",
+      "持久化与高可用",
+      "RDB 和 AOF 有什么区别？"
+    ],
+    "quickFacts": [
+      {
+        "k": "知识点",
+        "v": "RDB 和 AOF 有什么区别？"
+      },
+      {
+        "k": "所属模块",
+        "v": "持久化与高可用"
+      },
+      {
+        "k": "题库主题",
+        "v": "Redis"
+      },
+      {
+        "k": "难度",
+        "v": "中等"
+      },
+      {
+        "k": "面试频率",
+        "v": "高频"
+      },
+      {
+        "k": "核心关键词",
+        "v": "RDB / AOF / 快照 / 追加日志 / 恢复速度 / 数据安全"
+      }
+    ],
+    "sections": [
+      {
+        "id": "knowledge-summary",
+        "h2": "知识点总结",
+        "paragraphs": [
+          "RDB 是某个时间点的数据快照，AOF 是写命令追加日志；前者恢复快、文件紧凑，后者数据更安全但文件和重写成本更高。",
+          "RDB 像定期拍全量照片，恢复时直接看照片；AOF 像记操作流水，恢复时把命令重放一遍。照片恢复快，但两次拍照之间可能丢；流水更细，但文件会越来越长。"
+        ],
+        "bullets": [
+          "RDB 适合备份和快速恢复",
+          "AOF 适合降低数据丢失窗口",
+          "生产常常二者结合",
+          "重写和 fsync 策略影响性能"
+        ]
+      },
+      {
+        "id": "interview-highlights",
+        "h2": "面试常问",
+        "paragraphs": [],
+        "bullets": [
+          "AOF rewrite 为什么不会把历史命令原样保留？",
+          "RDB fork 时为什么可能影响线上延迟？",
+          "面试官问到「RDB 和 AOF 有什么区别」时，30 秒内应该先给出什么结论？",
+          "如果继续追问原理，应该补充哪些关键机制和边界条件？",
+          "在真实项目里，什么场景会用到这个知识点，怎么说明取舍？",
+          "这个问题最容易答错的误区是什么，应该如何纠正？"
+        ],
+        "callout": "面试模式下建议先给 30 秒结论，再按原理、边界、项目场景逐层展开。"
+      },
+      {
+        "id": "reference-answer",
+        "h2": "参考答案和解析",
+        "paragraphs": [
+          "RDB 是快照，文件紧凑、恢复快，但可能丢快照间数据；AOF 是追加写命令，数据安全性更好，但文件会增长，需要 rewrite，恢复可能更慢。生产常常两者结合。",
+          "RDB 保存某个时间点的内存快照，适合备份、迁移和快速恢复，但如果 Redis 在两次快照之间宕机，可能丢失这段时间的数据。AOF 会把写命令追加到日志里，配合 everysec 可以把丢失窗口压到较小范围，但 fsync、文件增长和 rewrite 都有成本。真正生产配置要看业务能接受的数据丢失窗口和恢复时间目标。",
+          "高级回答可以补 fork、写时复制和 rewrite 风险。生成 RDB 或 AOF rewrite 时子进程会参与磁盘写入，如果实例内存大、磁盘慢，可能影响延迟，所以要监控 fork 耗时、aof_rewrite、磁盘 IO 和持久化失败告警。",
+          "30 秒回答：先说明「RDB 和 AOF 有什么区别？」解决什么问题，再给出最核心的机制或结论。",
+          "1 分钟回答：继续按“定义和目标 -> 原理机制 -> 典型场景 -> 边界误区”的顺序展开，让答案既完整又容易复述。",
+          "深入追问：如果面试官继续问项目经验，要补充真实场景、方案取舍、风险控制和线上排查思路。"
+        ],
+        "bullets": [
+          "RDB 是快照",
+          "AOF 是写命令日志",
+          "恢复速度和数据安全取舍",
+          "AOF rewrite 和 fsync 策略"
+        ]
+      }
+    ],
+    "examPoint": "先讲两种持久化记录的东西不同，再比较恢复速度、数据丢失窗口和运行开销。",
+    "summary": "RDB 是某个时间点的数据快照，AOF 是写命令追加日志；前者恢复快、文件紧凑，后者数据更安全但文件和重写成本更高。",
+    "scenario": "Redis 承载登录态、排行榜或热点缓存时，宕机后你既关心恢复速度，也关心最多能丢多少秒数据。RDB 和 AOF 就是在这两个维度上做取舍。",
+    "article": {
+      "conclusion": "RDB 是某个时间点的数据快照，AOF 是写命令追加日志；前者恢复快、文件紧凑，后者数据更安全但文件和重写成本更高。",
+      "keyTakeaways": [
+        "RDB 适合备份和快速恢复",
+        "AOF 适合降低数据丢失窗口",
+        "生产常常二者结合",
+        "重写和 fsync 策略影响性能"
+      ],
+      "learningGoals": [
+        "RDB 和 AOF 分别记录什么？",
+        "AOF everysec 为什么常用？",
+        "为什么 AOF 需要 rewrite？"
+      ],
+      "plainSummary": "RDB 像定期拍全量照片，恢复时直接看照片；AOF 像记操作流水，恢复时把命令重放一遍。照片恢复快，但两次拍照之间可能丢；流水更细，但文件会越来越长。",
+      "plainRetell": "我会说 RDB 是快照，恢复快但可能丢快照间数据；AOF 是命令日志，数据更安全但恢复和重写有成本。生产通常二者结合，再根据业务能接受的丢失窗口选择 fsync 策略。",
+      "strongSummary": "RDB/AOF 题要围绕恢复速度、数据丢失窗口、运行开销和生产组合策略回答。",
+      "sections": [
+        {
+          "id": "scenario",
+          "h2": "一、先从真实场景开始",
+          "paragraphs": [
+            "Redis 承载登录态、排行榜或热点缓存时，宕机后你既关心恢复速度，也关心最多能丢多少秒数据。RDB 和 AOF 就是在这两个维度上做取舍。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "先建立问题动机，再进入原理推导。"
+        },
+        {
+          "id": "why",
+          "h2": "二、核心原理为什么成立",
+          "paragraphs": [
+            "RDB 保存的是内存数据快照，适合冷备和全量恢复。",
+            "AOF 追加写命令，配合 everysec 通常最多丢一秒左右数据，但要承担 fsync 和日志增长成本。",
+            "AOF rewrite 会把历史命令压缩成恢复当前数据所需的最小命令集。",
+            "生产经常同时开启两者，兼顾恢复速度和数据安全。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "每个结论都要解释为什么，不能停在概念层面。"
+        },
+        {
+          "id": "diagram",
+          "h2": "三、结构图解",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "diagram",
+          "highlight": "图解只承担辅助理解，不用为了有图而强行 Mermaid。",
+          "diagramCode": "Redis 持久化\n├─ RDB：定期生成 dump 快照\n└─ AOF：追加写命令 -> rewrite 压缩 -> 重放恢复",
+          "diagramType": "ascii-tree",
+          "fallbackDescription": "Redis 持久化\n├─ RDB：定期生成 dump 快照\n└─ AOF：追加写命令 -> rewrite 压缩 -> 重放恢复"
+        },
+        {
+          "id": "comparison",
+          "h2": "四、对比分析",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "comparison",
+          "highlight": "对比题必须让用户知道为什么不用另一个方案。",
+          "comparison": {
+            "title": "RDB 与 AOF 对比",
+            "headers": [
+              "维度",
+              "RDB",
+              "AOF",
+              "工程结论"
+            ],
+            "rows": [
+              [
+                "记录内容",
+                "某一刻完整数据",
+                "写命令日志",
+                "一个偏快照，一个偏流水"
+              ],
+              [
+                "恢复速度",
+                "通常较快",
+                "需要重放命令，可能更慢",
+                "大数据量更关注恢复耗时"
+              ],
+              [
+                "数据安全",
+                "两次快照间可能丢更多",
+                "everysec 常见丢失窗口更小",
+                "核心数据更偏向开启 AOF"
+              ],
+              [
+                "运行成本",
+                "fork 和写快照有开销",
+                "fsync 与 rewrite 有开销",
+                "都要结合内存和磁盘监控"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "code",
+          "h2": "五、代码或命令示例",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "code",
+          "highlight": "代码示例要能解释观察点，而不是只展示语法。",
+          "codeExample": {
+            "title": "常见持久化配置片段",
+            "language": "conf",
+            "code": "save 900 1\nappendonly yes\nappendfsync everysec\nno-appendfsync-on-rewrite no",
+            "explanation": "save 控制 RDB 快照触发条件；appendonly 开启 AOF；appendfsync everysec 是性能和数据安全比较常见的折中。"
+          }
+        },
+        {
+          "id": "mistake",
+          "h2": "六、常见误区",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "mistake",
+          "highlight": "误区要指出为什么错，以及正确边界是什么。",
+          "mistake": {
+            "mistake": "开启 AOF 就不会丢数据。",
+            "whyWrong": "appendfsync everysec 仍可能丢最近一秒左右数据，always 才更强但性能成本高。",
+            "correct": "要结合 fsync 策略说明数据丢失窗口，而不是只说开了 AOF 就安全。"
+          }
+        }
+      ]
+    },
+    "selfTests": [
+      {
+        "level": "基础",
+        "question": "RDB 和 AOF 分别记录什么？",
+        "hint": "先说问题本质，再说关键机制。",
+        "answer": "RDB 是快照，文件紧凑、恢复快，但可能丢快照间数据；AOF 是追加写命令，数据安全性更好，但文件会增长，需要 rewrite，恢复可能更慢。生产常常两者结合。",
+        "gradingCriteria": [
+          {
+            "criterion": "核心结论准确",
+            "points": 40,
+            "description": "能说出问题本质和关键机制。"
+          },
+          {
+            "criterion": "能解释为什么",
+            "points": 40,
+            "description": "不是只背名词，而是能解释设计原因。"
+          },
+          {
+            "criterion": "表达清晰",
+            "points": 20,
+            "description": "回答有结论和层次。"
+          }
+        ]
+      },
+      {
+        "level": "应用",
+        "question": "如果放到真实项目里，你会怎么判断该方案是否合适？",
+        "hint": "从场景、风险、监控和兜底四个角度想。",
+        "answer": "我会说 RDB 是快照，恢复快但可能丢快照间数据；AOF 是命令日志，数据更安全但恢复和重写有成本。生产通常二者结合，再根据业务能接受的丢失窗口选择 fsync 策略。",
+        "gradingCriteria": [
+          {
+            "criterion": "场景匹配",
+            "points": 35,
+            "description": "能说明适用条件。"
+          },
+          {
+            "criterion": "风险意识",
+            "points": 35,
+            "description": "能指出边界和误区。"
+          },
+          {
+            "criterion": "工程表达",
+            "points": 30,
+            "description": "能落到项目验证或排查。"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "Redis Documentation",
+        "url": "https://redis.io/docs/latest/",
+        "type": "官方文档",
+        "trustLevel": "S"
+      }
+    ],
+    "interviewContent": {
+      "question": "RDB 和 AOF 有什么区别？",
+      "questionVariants": [
+        "你能讲一下RDB 和 AOF 有什么区别吗？",
+        "如果面试官继续追问这个问题，你会从哪些维度展开？"
+      ],
+      "answer30s": "RDB 是快照，文件紧凑、恢复快，但可能丢快照间数据；AOF 是追加写命令，数据安全性更好，但文件会增长，需要 rewrite，恢复可能更慢。生产常常两者结合。",
+      "answer2min": "RDB 保存某个时间点的内存快照，适合备份、迁移和快速恢复，但如果 Redis 在两次快照之间宕机，可能丢失这段时间的数据。AOF 会把写命令追加到日志里，配合 everysec 可以把丢失窗口压到较小范围，但 fsync、文件增长和 rewrite 都有成本。真正生产配置要看业务能接受的数据丢失窗口和恢复时间目标。",
+      "advancedAnswer": "高级回答可以补 fork、写时复制和 rewrite 风险。生成 RDB 或 AOF rewrite 时子进程会参与磁盘写入，如果实例内存大、磁盘慢，可能影响延迟，所以要监控 fork 耗时、aof_rewrite、磁盘 IO 和持久化失败告警。",
+      "essentialPoints": [
+        {
+          "point": "RDB 是快照"
+        },
+        {
+          "point": "AOF 是写命令日志"
+        },
+        {
+          "point": "恢复速度和数据安全取舍"
+        },
+        {
+          "point": "AOF rewrite 和 fsync 策略"
+        }
+      ],
+      "bonusPoints": [
+        {
+          "point": "只需要生成能恢复当前状态的最小命令集。",
+          "why": "AOF rewrite 为什么不会把历史命令原样保留？"
+        },
+        {
+          "point": "大内存实例 fork 和写时复制会带来 CPU、内存和磁盘压力。",
+          "why": "RDB fork 时为什么可能影响线上延迟？"
+        }
+      ],
+      "advancedPoints": [],
+      "deductPoints": [
+        {
+          "point": "开启 AOF 就不会丢数据。",
+          "why": "appendfsync everysec 仍可能丢最近一秒左右数据，always 才更强但性能成本高。"
+        }
+      ],
+      "followUps": [
+        {
+          "question": "AOF rewrite 为什么不会把历史命令原样保留？",
+          "difficulty": "medium",
+          "keyAnswer": "只需要生成能恢复当前状态的最小命令集。"
+        },
+        {
+          "question": "RDB fork 时为什么可能影响线上延迟？",
+          "difficulty": "hard",
+          "keyAnswer": "大内存实例 fork 和写时复制会带来 CPU、内存和磁盘压力。"
+        }
+      ]
+    }
+  }
+}

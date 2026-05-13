@@ -1,0 +1,22 @@
+{
+  "id": "bank-mysql",
+  "name": "MySQL题库",
+  "subtitle": "MySQL 高频面试题库",
+  "tags": [
+    "MySQL",
+    "索引",
+    "事务",
+    "锁",
+    "SQL"
+  ],
+  "updatedAt": "2026-05-09",
+  "stats": {
+    "topics": 14,
+    "paths": 4
+  },
+  "description": "覆盖索引、锁、事务、MVCC 和 SQL 优化，是后端数据库面试的核心题库。",
+  "visibility": "public",
+  "sortOrder": 0,
+  "cover": "M",
+  "defaultTopicId": null
+}

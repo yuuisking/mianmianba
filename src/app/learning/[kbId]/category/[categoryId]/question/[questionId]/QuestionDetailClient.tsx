@@ -10,8 +10,8 @@ import {
   InterviewTrainingPanel,
   SelfTestAssessmentCard,
 } from "@/app/learning/_components/LearningAssessmentPanels";
-import type { LearningQuestionDetail } from "@/lib/learning/questionDetail";
 import type { BankTreeGroup } from "@/lib/learning/bankStudio";
+import type { LearningQuestionDetail } from "@/lib/learning/documentService";
 
 type ReaderMode = "knowledge" | "quick" | "deep" | "interview";
 
@@ -343,6 +343,147 @@ function RichArticleSection(props: {
 }
 
 /**
+ * 渲染一组可跳转的知识关联链接。
+ * @param {{ title: string; items: Array<{ id: string; title: string; summary: string; path: string; relation?: string; chapterName?: string; bankName?: string }> }} props 分组标题与链接数组。
+ * @returns {ReactNode} 关联链接列表。
+ */
+function RelationLinkList(props: {
+  title: string;
+  items: Array<{
+    id: string;
+    title: string;
+    summary: string;
+    path: string;
+    relation?: string;
+    chapterName?: string;
+    bankName?: string;
+  }>;
+}): ReactNode {
+  const { title, items } = props;
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="learning-relations__card">
+      <div className="learning-relations__card-head">
+        <strong>{title}</strong>
+        <span>{items.length} 条</span>
+      </div>
+      <div className="learning-relations__list">
+        {items.map((item) => (
+          <Link key={item.id} href={item.path} className="learning-relations__item" prefetch>
+            <div>
+              <strong>{item.title}</strong>
+              <span>{[item.relation, item.chapterName, item.bankName].filter(Boolean).join(" · ")}</span>
+            </div>
+            <p>{item.summary}</p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * 渲染知识卡片详情页的关联模块，补齐前置知识、相关题目和学习路径建议。
+ * @param {{ question: LearningQuestionDetail }} props 当前文档详情。
+ * @returns {ReactNode} 关联模块区域。
+ */
+function KnowledgeRelationsPanel(props: { question: LearningQuestionDetail }): ReactNode {
+  const { question } = props;
+  const relationBundle = question.knowledgeRelations;
+  const relatedQuestions = question.relatedQuestions;
+  const interviewAngles = relationBundle.interviewAngles;
+  const hasContent =
+    relationBundle.prerequisites.length > 0 ||
+    relationBundle.relatedKnowledgeCards.length > 0 ||
+    relationBundle.pathTips.length > 0 ||
+    relatedQuestions.length > 0 ||
+    interviewAngles.length > 0;
+
+  if (!hasContent) {
+    return null;
+  }
+
+  return (
+    <section className="learning-relations">
+      <div className="learning-relations__header">
+        <div>
+          <span>关联学习</span>
+          <h2>前置知识、相关题目和下一步路径</h2>
+        </div>
+        <p>把当前这篇文档接回完整学习链路，避免只看单题不串专题。</p>
+      </div>
+
+      <div className="learning-relations__grid">
+        <RelationLinkList title="前置知识" items={relationBundle.prerequisites} />
+        <RelationLinkList title="相关知识点" items={relationBundle.relatedKnowledgeCards} />
+
+        {relatedQuestions.length > 0 || interviewAngles.length > 0 ? (
+          <section className="learning-relations__card">
+            <div className="learning-relations__card-head">
+              <strong>相关面试题</strong>
+              <span>{relatedQuestions.length} 道</span>
+            </div>
+            <div className="learning-relations__question-list">
+              {relatedQuestions.map((item) => (
+                <Link key={item.id} href={item.path} className="learning-relations__question-item" prefetch>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span className={`learning-reader__difficulty learning-reader__difficulty--${difficultyLabel[item.difficulty].tone}`}>
+                      {difficultyLabel[item.difficulty].text}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {interviewAngles.length > 0 ? (
+              <div className="learning-relations__angle-list">
+                {interviewAngles.map((section) => (
+                  <div key={section.title} className="learning-relations__angle-card">
+                    <strong>{section.title}</strong>
+                    <ul>
+                      {section.bullets.map((item) => (
+                        <li key={`${section.title}-${item}`}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {relationBundle.pathTips.length > 0 ? (
+          <section className="learning-relations__card">
+            <div className="learning-relations__card-head">
+              <strong>学习路径建议</strong>
+              <span>{relationBundle.pathTips.length} 条</span>
+            </div>
+            <div className="learning-relations__path-list">
+              {relationBundle.pathTips.map((item) => (
+                <article key={`${item.title}-${item.path ?? "inline"}`} className="learning-relations__path-item">
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.summary}</p>
+                  </div>
+                  {item.path ? (
+                    <Link href={item.path} className="learning-rich-train-button" prefetch>
+                      去下一步
+                    </Link>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+/**
  * 题目详情页客户端交互层，只负责模式切换、答案展开和进度记录，不再承担首屏取数。
  * @param {QuestionDetailClientProps} props 当前题目与整库目录的服务端首屏数据。
  * @returns {ReactNode} 可直接交给服务端页面使用的交互式阅读界面。
@@ -351,6 +492,10 @@ export default function QuestionDetailClient(props: QuestionDetailClientProps): 
   const { kbId, questionId, initialQuestion, initialTree } = props;
   const richArticle = initialQuestion.answer.article;
   const interviewContent = initialQuestion.answer.interviewContent;
+  const contentMeta = initialQuestion.contentMeta;
+  const readerLayoutClass =
+    contentMeta?.layout === "knowledge" || richArticle ? "learning-reader--knowledge-layout" : "learning-reader--question-layout";
+  const wideBodyClass = contentMeta?.needsWideBody !== false ? "learning-reader--wide-body" : "";
   const targetedPracticePath = useMemo(() => buildTargetedPracticePath(initialQuestion), [initialQuestion]);
   const [showAnswer, setShowAnswer] = useState(false);
   const [readerMode, setReaderMode] = useState<ReaderMode>(() => (richArticle ? "deep" : "knowledge"));
@@ -428,7 +573,7 @@ export default function QuestionDetailClient(props: QuestionDetailClientProps): 
     const showInterviewArticle = readerMode === "interview";
 
     return (
-      <section className="learning-reader learning-reader--rich">
+      <section className={`learning-reader learning-reader--rich ${readerLayoutClass} ${wideBodyClass}`.trim()}>
         <div className="learning-reader__shell">
           <div className="learning-reader__layout learning-reader__layout--with-toc">
             <aside className="learning-reader__nav">
@@ -593,6 +738,8 @@ export default function QuestionDetailClient(props: QuestionDetailClientProps): 
                         </div>
                       </section>
                     ) : null}
+
+                    <KnowledgeRelationsPanel question={initialQuestion} />
                   </>
                 ) : (
                   <InterviewTrainingPanel
@@ -665,7 +812,7 @@ export default function QuestionDetailClient(props: QuestionDetailClientProps): 
   }
 
   return (
-    <section className="learning-reader">
+    <section className={`learning-reader ${readerLayoutClass} ${wideBodyClass}`.trim()}>
       <div className="learning-reader__shell">
         <div className="learning-reader__layout">
           <aside className="learning-reader__nav">
@@ -822,6 +969,8 @@ export default function QuestionDetailClient(props: QuestionDetailClientProps): 
                   ) : null}
                 </section>
               ) : null}
+
+              {readerMode === "knowledge" ? <KnowledgeRelationsPanel question={initialQuestion} /> : null}
 
               {readerMode === "knowledge" ? (
                 <section className="learning-reader__section learning-reader__article learning-reader__practice-footer">

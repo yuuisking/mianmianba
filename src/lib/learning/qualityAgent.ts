@@ -2,7 +2,14 @@
 
 import prisma from "@/lib/prisma";
 import { callDeepSeek } from "@/lib/ai/deepseek";
-import { normalizeLearningContent, type LearningContent } from "@/lib/learning/content-contract";
+import {
+  normalizeInterviewContent,
+  normalizeLearningContent,
+  validateDeepReadReadiness,
+  validateDocumentContracts,
+  type InterviewContent,
+  type LearningContent,
+} from "@/lib/learning/content-contract";
 
 type QualityCheckItem = {
   key: string;
@@ -98,6 +105,7 @@ async function loadCurrentDocumentVersion(documentId: string): Promise<{
   version: {
     id: string;
     learningContent: unknown;
+    interviewContent: unknown;
   };
 }> {
   const document = await prisma.document.findUnique({
@@ -121,6 +129,7 @@ async function loadCurrentDocumentVersion(documentId: string): Promise<{
     select: {
       id: true,
       learningContent: true,
+      interviewContent: true,
     },
   });
 
@@ -140,100 +149,108 @@ async function loadCurrentDocumentVersion(documentId: string): Promise<{
 
 /**
  * 生成确定性门禁检查，先用硬规则兜住结构、来源、图表和训练闭环。
- * @param {LearningContent} content 标准化后的学习内容。
+ * @param {{ title: string; learningContent: LearningContent; interviewContent: InterviewContent }} input 标准化后的学习与训练内容。
  * @returns {{ checks: QualityCheckItem[]; issues: QualityAgentResult["issues"] }} 规则检查结果。
  */
-function buildRuleChecks(content: LearningContent): {
+function buildRuleChecks(input: {
+  title: string;
+  learningContent: LearningContent;
+  interviewContent: InterviewContent;
+}): {
   checks: QualityCheckItem[];
   issues: QualityAgentResult["issues"];
 } {
-  const quickBlocks = [
-    content.quickLook?.summary,
-    ...(content.quickLook?.takeaways ?? []),
-    ...(content.quickLook?.explainLikeImFive ?? []),
-    content.quickLook?.retell,
-  ].filter(Boolean);
-  const articleSections = content.article?.sections ?? [];
-  const sectionTitles = articleSections.map((item) => item.heading || item.h2 || "");
-  const selfTests = content.selfTest?.questions ?? [];
-  const interview = content.interview;
-  const sources = content.sources ?? [];
-
-  const structurePassed =
-    quickBlocks.length >= 4 &&
-    articleSections.length >= 6 &&
-    selfTests.length > 0 &&
-    Boolean(interview?.essentialPoints.length);
-  const sourcePassed = sources.length > 0 && sources.every((item) => item.title && item.url);
+  const contractValidation = validateDocumentContracts(input.learningContent, input.interviewContent, input.title);
+  const deepReadValidation = validateDeepReadReadiness(input.title, input.learningContent);
+  const findCheck = (name: string): boolean => contractValidation.checks.find((item) => item.name === name)?.pass ?? false;
+  const sources = input.learningContent.sources ?? [];
+  const sourcePassed = findCheck("sources_present");
   const sourceDetailPassed =
     sources.length > 0 &&
-    sources.some((item) => item.applicableVersion || item.reviewedAt || (item.facts?.length ?? 0) > 0);
-  const diagramPassed =
-    articleSections.filter((item) => item.type === "diagram" || item.diagramCode || item.diagramSpec).length === 0 ||
-    articleSections.some((item) => item.diagramSpec?.type === "flow");
-  const trainingPassed =
-    selfTests.length > 0 &&
-    selfTests.every((item) => (item.gradingCriteria?.length ?? 0) > 0) &&
-    Boolean(interview?.answer30s) &&
-    Boolean(interview?.answer2min) &&
-    Boolean(interview?.followUps.length);
+    sources.every((item) => Boolean(item.title && item.url && (item.applicableVersion || item.reviewedAt || (item.facts?.length ?? 0) > 0)));
 
   const checks: QualityCheckItem[] = [
     {
-      key: "structure",
-      passed: structurePassed,
-      score: structurePassed ? 24 : 10,
-      message: structurePassed ? "速读、深读、自测和面试结构完整。" : "结构仍不够完整，缺少固定学习骨架。",
+      key: "article_structure",
+      passed: findCheck("article_structure"),
+      score: findCheck("article_structure") ? 22 : 8,
+      message: findCheck("article_structure") ? "文章骨架完整。" : "文章骨架不完整，缺少固定学习结构。",
     },
     {
-      key: "source",
-      passed: sourcePassed && sourceDetailPassed,
-      score: sourcePassed && sourceDetailPassed ? 18 : sourcePassed ? 10 : 2,
-      message: sourcePassed && sourceDetailPassed ? "来源与可信度字段完整。" : "来源字段存在缺失，可信度表达还不够。",
+      key: "self_tests",
+      passed: findCheck("self_tests"),
+      score: findCheck("self_tests") ? 16 : 6,
+      message: findCheck("self_tests") ? "自测结构完整。" : "自测不足或缺少评分标准。",
     },
     {
-      key: "diagram",
-      passed: diagramPassed,
-      score: diagramPassed ? 18 : 6,
-      message: diagramPassed ? "图表已采用标准协议或当前文档无需图解。" : "图表缺少标准图协议或稳定图解结构。",
+      key: "interview_points",
+      passed: findCheck("interview_points"),
+      score: findCheck("interview_points") ? 16 : 6,
+      message: findCheck("interview_points") ? "面试训练要点完整。" : "面试训练要点不完整。",
     },
     {
-      key: "training",
-      passed: trainingPassed,
-      score: trainingPassed ? 22 : 8,
-      message: trainingPassed ? "训练闭环具备自测、评分标准和面试追问。" : "训练闭环不完整，缺少评分标准或追问。",
+      key: "sources_present",
+      passed: sourcePassed,
+      score: sourcePassed ? 10 : 2,
+      message: sourcePassed ? "已提供来源信息。" : "来源字段缺失。",
     },
     {
-      key: "depth",
-      passed: sectionTitles.length >= 6,
-      score: sectionTitles.length >= 6 ? 18 : 8,
-      message: sectionTitles.length >= 6 ? "深读章节数量达到试生产要求。" : "深读章节偏少，内容深度不足。",
+      key: "source_detail",
+      passed: sourceDetailPassed,
+      score: sourceDetailPassed ? 10 : 4,
+      message: sourceDetailPassed ? "来源细节完整。" : "来源细节不足，缺少版本、事实或复核时间。",
+    },
+    {
+      key: "deep_read_gate",
+      passed: deepReadValidation.ready,
+      score: deepReadValidation.ready ? 26 : 8,
+      message:
+        deepReadValidation.missingBlocks.length === 0
+          ? "15 分钟深读门禁通过。"
+          : `15 分钟深读缺少：${deepReadValidation.missingBlocks.join("、")}。`,
     },
   ];
 
   const issues: QualityAgentResult["issues"] = [];
-  if (!structurePassed) {
-    issues.push({ severity: "high", type: "structure", message: "速读/深读/训练结构未达到试生产骨架要求。" });
+  if (!findCheck("article_structure") || !deepReadValidation.ready) {
+    issues.push({ severity: "high", type: "structure", message: "速读/深读结构未达到试生产骨架要求。" });
   }
-  if (!(sourcePassed && sourceDetailPassed)) {
-    issues.push({ severity: "medium", type: "source", message: "来源与可信度字段不完整，建议补适用版本、引用事实和复核时间。" });
-  }
-  if (!diagramPassed) {
-    issues.push({ severity: "high", type: "diagram", message: "图解未走标准协议，后续批量生产风险较高。" });
-  }
-  if (!trainingPassed) {
+  if (!findCheck("self_tests") || !findCheck("interview_points")) {
     issues.push({ severity: "high", type: "training", message: "训练闭环未齐，自测或面试内容不足以直接发布。" });
+  }
+  if (!sourcePassed || !sourceDetailPassed) {
+    issues.push({ severity: "medium", type: "source", message: "来源与可信度字段不完整，建议补适用版本、引用事实和复核时间。" });
   }
 
   return { checks, issues };
 }
 
 /**
+ * 清洗模型返回的 JSON 文本，兼容 ```json 代码块和前后多余说明。
+ * @param {string} raw 模型原始返回。
+ * @returns {string} 可交给 JSON.parse 的纯 JSON 文本。
+ */
+function extractJsonPayload(raw: string): string {
+  const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = (fencedMatch?.[1] ?? raw).trim();
+  const startIndex = candidate.indexOf("{");
+  const endIndex = candidate.lastIndexOf("}");
+  if (startIndex >= 0 && endIndex > startIndex) {
+    return candidate.slice(startIndex, endIndex + 1).trim();
+  }
+  return candidate;
+}
+
+/**
  * 调用大模型做内容质检，重点检查学习性、模板味和面试可用性。
- * @param {{ title: string; content: LearningContent }} input 文档标题和标准化内容。
+ * @param {{ title: string; learningContent: LearningContent; interviewContent: InterviewContent }} input 文档标题和标准化内容。
  * @returns {Promise<ReviewAssessment>} AI 评审结果。
  */
-async function runAiReview(input: { title: string; content: LearningContent }): Promise<ReviewAssessment> {
+async function runAiReview(input: {
+  title: string;
+  learningContent: LearningContent;
+  interviewContent: InterviewContent;
+}): Promise<ReviewAssessment> {
   const prompt = [
     "你是学习平台的内容质检专家，只做评审，不重写全文。",
     "请根据下面文档内容，从学习价值、面试可用性、模板味、可信度表达、图解稳定性五个维度打分。",
@@ -241,7 +258,8 @@ async function runAiReview(input: { title: string; content: LearningContent }): 
     "recommendation 只能是 publish/review/block；riskLevel 只能是 low/medium/high；issues 里每项含 severity,type,message。",
     "",
     `标题：${input.title}`,
-    `内容：${JSON.stringify(input.content)}`,
+    `学习内容：${JSON.stringify(input.learningContent)}`,
+    `训练内容：${JSON.stringify(input.interviewContent)}`,
   ].join("\n");
 
   try {
@@ -254,7 +272,7 @@ async function runAiReview(input: { title: string; content: LearningContent }): 
       retryDelayMs: 800,
     });
 
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const parsed = JSON.parse(extractJsonPayload(raw)) as Record<string, unknown>;
     return {
       score: normalizeScore(parsed.score),
       riskLevel: normalizeRiskLevel(parsed.riskLevel),
@@ -421,7 +439,8 @@ export async function runDocumentQualityAgent(input: {
   triggeredBy?: string | null;
 }): Promise<QualityAgentResult> {
   const { document, version } = await loadCurrentDocumentVersion(input.documentId);
-  const content = normalizeLearningContent(version.learningContent);
+  const learningContent = normalizeLearningContent(version.learningContent);
+  const interviewContent = normalizeInterviewContent(version.interviewContent);
   const aiTask = await prisma.aiTask.create({
     data: {
       taskType: "QUALITY_AUDIT",
@@ -438,8 +457,16 @@ export async function runDocumentQualityAgent(input: {
   });
 
   try {
-    const ruleResult = buildRuleChecks(content);
-    const aiReview = await runAiReview({ title: document.title, content });
+    const ruleResult = buildRuleChecks({
+      title: document.title,
+      learningContent,
+      interviewContent,
+    });
+    const aiReview = await runAiReview({
+      title: document.title,
+      learningContent,
+      interviewContent,
+    });
     const result = mergeQualityAssessment(ruleResult, aiReview);
     await persistQualityAgentResult({
       documentId: document.id,

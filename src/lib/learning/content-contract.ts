@@ -107,7 +107,17 @@ export type LearningArticle = {
 };
 
 export type LearningContent = {
+  contentType?: "interview_question" | "knowledge_card";
   templateType?: "concept" | "principle" | "comparison" | "governance" | "design";
+  readingExperience?: {
+    layout?: "question" | "knowledge";
+    needsWideBody?: boolean;
+  };
+  diagramGuidance?: {
+    required?: boolean;
+    reason?: string;
+    completenessChecks?: string[];
+  };
   examPoint?: string;
   summary?: string;
   scenario?: string;
@@ -190,6 +200,15 @@ function normalizeStringArray(value: unknown): string[] {
 }
 
 /**
+ * 过滤 map 过程中的空项，便于严格类型检查通过。
+ * @param {T | null | undefined} value 任意可空值。
+ * @returns {value is T} 仅保留非空值。
+ */
+function isNonNull<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
+/**
  * 将未知 JSON 收口为来源与可信度字段，统一适配版本、引用事实和最近复核时间。
  * @param {unknown} value 任意 JSON 值。
  * @returns {LearningSource[]} 标准化后的来源数组。
@@ -200,7 +219,7 @@ function normalizeLearningSources(value: unknown): LearningSource[] {
   }
 
   return value
-    .map((item) => {
+    .map((item): LearningSource | null => {
       if (!item || typeof item !== "object") {
         return null;
       }
@@ -219,9 +238,9 @@ function normalizeLearningSources(value: unknown): LearningSource[] {
         applicableVersion: typeof source.applicableVersion === "string" ? source.applicableVersion.trim() : undefined,
         facts: normalizeStringArray(source.facts),
         reviewedAt: typeof source.reviewedAt === "string" ? source.reviewedAt.trim() : undefined,
-      } satisfies LearningSource;
+      };
     })
-    .filter((item): item is LearningSource => Boolean(item));
+    .filter(isNonNull);
 }
 
 /**
@@ -235,7 +254,7 @@ function normalizeDiagramNodes(value: unknown): DiagramFlowNode[] {
   }
 
   return value
-    .map((item, index) => {
+    .map((item, index): DiagramFlowNode | null => {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         return null;
       }
@@ -250,9 +269,9 @@ function normalizeDiagramNodes(value: unknown): DiagramFlowNode[] {
         id: typeof record.id === "string" && record.id.trim() ? record.id.trim() : `node-${index + 1}`,
         label,
         shortLabel: typeof record.shortLabel === "string" ? record.shortLabel.trim() : undefined,
-      } satisfies DiagramFlowNode;
+      };
     })
-    .filter((item): item is DiagramFlowNode => Boolean(item));
+    .filter(isNonNull);
 }
 
 /**
@@ -266,7 +285,7 @@ function normalizeDiagramEdges(value: unknown): DiagramFlowEdge[] {
   }
 
   return value
-    .map((item) => {
+    .map((item): DiagramFlowEdge | null => {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         return null;
       }
@@ -282,9 +301,9 @@ function normalizeDiagramEdges(value: unknown): DiagramFlowEdge[] {
         from,
         to,
         label: typeof record.label === "string" ? record.label.trim() : undefined,
-      } satisfies DiagramFlowEdge;
+      };
     })
-    .filter((item): item is DiagramFlowEdge => Boolean(item));
+    .filter(isNonNull);
 }
 
 /**
@@ -462,7 +481,7 @@ function normalizeGradingCriteria(value: unknown): GradingCriterion[] {
   }
 
   return value
-    .map((item) => {
+    .map((item): GradingCriterion | null => {
       if (!item || typeof item !== "object") {
         return null;
       }
@@ -487,9 +506,9 @@ function normalizeGradingCriteria(value: unknown): GradingCriterion[] {
         criterion,
         points,
         description,
-      } satisfies GradingCriterion;
+      };
     })
-    .filter((item): item is GradingCriterion => Boolean(item));
+    .filter(isNonNull);
 }
 
 /**
@@ -525,9 +544,9 @@ function normalizeSelfTests(value: unknown): SelfTest[] {
         hint: typeof record.hint === "string" ? record.hint.trim() : undefined,
         answer: typeof record.answer === "string" ? record.answer.trim() : undefined,
         gradingCriteria: normalizeGradingCriteria(record.gradingCriteria),
-      } satisfies SelfTest;
+      };
     })
-    .filter((item): item is SelfTest => Boolean(item));
+    .filter(isNonNull);
 }
 
 /**
@@ -659,7 +678,7 @@ export function normalizeLearningContent(value?: Prisma.JsonValue | null): Learn
 
   const sections = Array.isArray(article?.sections)
     ? article.sections
-        .map((item, index) => {
+        .map((item, index): ArticleSection | null => {
           if (!item || typeof item !== "object") {
             return null;
           }
@@ -746,16 +765,50 @@ export function normalizeLearningContent(value?: Prisma.JsonValue | null): Learn
               section.quiz && typeof section.quiz === "object" && !Array.isArray(section.quiz)
                 ? normalizeSelfTests([section.quiz])[0]
                 : undefined,
-          } satisfies ArticleSection;
+          };
         })
-        .filter((item): item is ArticleSection => Boolean(item))
+        .filter(isNonNull)
     : [];
 
   return {
+    contentType:
+      record.contentType === "knowledge_card" || record.contentType === "interview_question"
+        ? record.contentType
+        : undefined,
     templateType:
       typeof record.templateType === "string" &&
       ["concept", "principle", "comparison", "governance", "design"].includes(record.templateType)
         ? (record.templateType as LearningContent["templateType"])
+        : undefined,
+    readingExperience:
+      record.readingExperience && typeof record.readingExperience === "object" && !Array.isArray(record.readingExperience)
+        ? {
+            layout:
+              (record.readingExperience as Record<string, unknown>).layout === "knowledge" ||
+              (record.readingExperience as Record<string, unknown>).layout === "question"
+                ? ((record.readingExperience as Record<string, unknown>).layout as "knowledge" | "question")
+                : undefined,
+            needsWideBody:
+              typeof (record.readingExperience as Record<string, unknown>).needsWideBody === "boolean"
+                ? ((record.readingExperience as Record<string, unknown>).needsWideBody as boolean)
+                : undefined,
+          }
+        : undefined,
+    diagramGuidance:
+      record.diagramGuidance && typeof record.diagramGuidance === "object" && !Array.isArray(record.diagramGuidance)
+        ? {
+            required:
+              typeof (record.diagramGuidance as Record<string, unknown>).required === "boolean"
+                ? ((record.diagramGuidance as Record<string, unknown>).required as boolean)
+                : undefined,
+            reason:
+              typeof (record.diagramGuidance as Record<string, unknown>).reason === "string"
+                ? ((record.diagramGuidance as Record<string, unknown>).reason as string).trim()
+                : undefined,
+            completenessChecks: normalizeStringArray(
+              (record.diagramGuidance as Record<string, unknown>).completenessChecks
+            ),
+          }
         : undefined,
     examPoint: typeof record.examPoint === "string" ? record.examPoint.trim() : undefined,
     summary: typeof record.summary === "string" ? record.summary.trim() : undefined,
@@ -800,7 +853,7 @@ export function normalizeLearningContent(value?: Prisma.JsonValue | null): Learn
         : undefined,
     concepts: Array.isArray(record.concepts)
       ? (record.concepts as unknown[])
-          .map((item) => {
+          .map((item): { name: string; description: string } | null => {
             if (!item || typeof item !== "object") {
               return null;
             }
@@ -812,7 +865,7 @@ export function normalizeLearningContent(value?: Prisma.JsonValue | null): Learn
             }
             return { name, description };
           })
-          .filter((item): item is { name: string; description: string } => Boolean(item))
+          .filter(isNonNull)
       : [],
     details: Array.isArray(record.details)
       ? (record.details as unknown[])
@@ -849,9 +902,9 @@ export function normalizeLearningContent(value?: Prisma.JsonValue | null): Learn
               language,
               code,
               explanation: typeof example.explanation === "string" ? example.explanation.trim() : undefined,
-            } satisfies CodeExample;
+            };
           })
-          .filter((item): item is CodeExample => Boolean(item))
+          .filter(isNonNull)
       : [],
     commonMistakes: Array.isArray(record.commonMistakes)
       ? (record.commonMistakes as unknown[])

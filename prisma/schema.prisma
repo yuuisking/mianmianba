@@ -21,60 +21,241 @@ enum UserStatus {
 }
 
 model User {
-  id           String      @id @default(cuid())
-  email        String      @unique
+  id           String     @id @default(cuid())
+  email        String     @unique
   password     String
   name         String?
   nickname     String?
   avatarUrl    String?
-  role         UserRole    @default(USER)
-  status       UserStatus  @default(ACTIVE)
-  vipType      String      @default("none")
+  role         UserRole   @default(USER)
+  status       UserStatus @default(ACTIVE)
+  vipType      String     @default("none")
   vipExpiresAt DateTime?
   lastLoginAt  DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   sessions           InterviewSession[]
   weaknesses         Weakness[]
   knowledgeDocuments KnowledgeDocument[]
   questionProgress   UserQuestionProgress[]
+  growthProfile      UserGrowthProfile?
+  progressSnapshots  UserProgressSnapshot[]
+  weaknessRecords    UserWeaknessRecord[]
+  interviewPlans     InterviewPlan[]
+  interviewTemplates UserInterviewTemplate[]
+  interviewRounds    InterviewRound[]
+  interviewExperienceTasks InterviewExperienceCollectionTask[]
+  codingSessions     CodingSession[]
+  reviewSnapshots    ReviewSnapshot[]
+  reviewExecutions   ReviewActionExecution[]
+  notifications      InAppNotification[]
+}
+
+enum InterviewPlanMode {
+  STAGE
+  FULL_FLOW
+}
+
+enum InterviewPlanStatus {
+  DRAFT
+  PROFILE_READY
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+enum InterviewStageType {
+  STAGE_INTERVIEW
+  FIRST_ROUND
+  SECOND_ROUND
+  THIRD_ROUND
+  HR_ROUND
+  OFFER_REVIEW
+  CUSTOM
+}
+
+enum InterviewStageStatus {
+  PENDING
+  READY
+  ACTIVE
+  COMPLETED
+  SKIPPED
+  BLOCKED
+}
+
+enum InterviewRoundStatus {
+  PENDING
+  ASKING
+  USER_ANSWERING
+  FOLLOW_UP
+  CODING
+  SCORING
+  DONE
+  ABORTED
+}
+
+enum InterviewExperienceCollectionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum InterviewQuestionKind {
+  OPEN_ENDED
+  PROJECT_DEEP_DIVE
+  SYSTEM_DESIGN
+  BEHAVIORAL
+  CODING
+  HR
+  ENGLISH
+  CUSTOM
+}
+
+enum InterviewQuestionStatus {
+  PENDING
+  ASKING
+  ANSWERED
+  SCORED
+  SKIPPED
+}
+
+enum CodingSessionStatus {
+  READY
+  EDITING
+  RUNNING
+  SUBMITTED
+  REVIEWED
+  CLOSED
+}
+
+enum AgentRunRole {
+  PLANNER
+  RESUME_ANALYST
+  JD_ANALYST
+  INTERVIEWER
+  EVIDENCE
+  SCORER
+  SUMMARY
+  REPORT
+  COACH
+  CODE_INTERVIEWER
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum WeaknessRecordStatus {
+  ACTIVE
+  RESOLVED
+  SUPPRESSED
+}
+
+enum ProgressSnapshotType {
+  LATEST
+  DAILY
+  WEEKLY
+}
+
+enum ReviewConfidenceLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ReviewIssueStatus {
+  OBSERVING
+  ACTIVE
+  RESOLVED
+}
+
+enum ReviewSampleValidity {
+  VALID
+  INVALID
+}
+
+enum ReviewActionPriority {
+  TODAY
+  THIS_WEEK
+  KEEP
+}
+
+enum ReviewActionExecutionStatus {
+  STARTED
+  COMPLETED
+  ABORTED
+  FAILED
 }
 
 model InterviewSession {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    String   @default("ongoing") // e.g., "ongoing", "completed"
-  score     Int?
-  mode      String   @default("general") // e.g., "general", "technical", "behavioral"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String
+  planId         String?
+  stageId        String?
+  roundId        String?
+  sourceLaunchId String?
+  roomKey        String?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status         String   @default("ongoing") // e.g., "ongoing", "completed"
+  score          Int?
+  mode           String   @default("general") // e.g., "general", "technical", "behavioral"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   messages Message[]
   report   Report?
+
+  @@index([userId, createdAt])
+  @@index([userId, roomKey])
+  @@index([userId, planId, stageId, roundId, mode])
 }
 
 model Message {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   sessionId String
   session   InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  role      String   // e.g., "user", "assistant", "system"
+  role      String // e.g., "user", "assistant", "system"
   content   String
-  createdAt DateTime @default(now())
+  createdAt DateTime         @default(now())
+}
+
+model InAppNotification {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  title      String
+  content    String
+  actionPath String?
+  isRead     Boolean  @default(false)
+  readAt     DateTime?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
 }
 
 model Report {
-  id         String   @id @default(cuid())
-  sessionId  String   @unique
+  id         String           @id @default(cuid())
+  sessionId  String           @unique
   session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   highlights String
   risks      String
   nextSteps  String
-  dimensions String?  // Add dimensions field
-  evidence   String?  // Add evidence field
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  dimensions String? // Add dimensions field
+  evidence   String? // Add evidence field
+  metadata   String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 }
 
 model Weakness {
@@ -85,6 +266,552 @@ model Weakness {
   description String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model UserGrowthProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  targetCompany     String?
+  targetRole        String?
+  targetLevel       String?
+  targetTrack       String?
+  targetOfferGoal   String?
+  personaSummary    String?
+  radarSnapshot     Json?
+  preferenceProfile Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([targetRole])
+}
+
+model UserProgressSnapshot {
+  id                      String               @id @default(cuid())
+  userId                  String
+  snapshotType            ProgressSnapshotType @default(LATEST)
+  snapshotDate            DateTime             @default(now())
+  trainingSessionsCount   Int                  @default(0)
+  interviewSessionsCount  Int                  @default(0)
+  completedInterviewCount Int                  @default(0)
+  reviewCount             Int                  @default(0)
+  streakDays              Int                  @default(0)
+  retrainingRate          Float?
+  averageScore            Float?
+  latestTrainingTitle     String?
+  latestTrainingPath      String?
+  latestWeaknesses        Json?
+  continueTraining        Json?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, snapshotType, snapshotDate])
+}
+
+model WeaknessDimension {
+  id                 String   @id @default(cuid())
+  slug               String   @unique
+  name               String
+  category           String
+  description        String?
+  defaultSeverity    Float?
+  recommendedActions Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  userWeaknesses UserWeaknessRecord[]
+}
+
+model UserWeaknessRecord {
+  id               String               @id @default(cuid())
+  userId           String
+  dimensionId      String
+  status           WeaknessRecordStatus @default(ACTIVE)
+  sourceType       String?
+  sourceSessionId  String?
+  sourceQuestionId String?
+  severityScore    Float?
+  frequency        Int                  @default(1)
+  latestScore      Float?
+  recommendation   String?
+  evidenceSummary  String?
+  firstDetectedAt  DateTime             @default(now())
+  lastDetectedAt   DateTime             @default(now())
+  resolvedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dimension WeaknessDimension @relation(fields: [dimensionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([dimensionId])
+}
+
+model InterviewPlan {
+  id                 String              @id @default(cuid())
+  userId             String
+  mode               InterviewPlanMode
+  status             InterviewPlanStatus @default(DRAFT)
+  sourceLaunchId     String?
+  companyName        String?
+  roleName           String?
+  targetLevel        String?
+  language           String?
+  intensity          String?
+  jdText             String?
+  resumeText         String?
+  focusAreas         String[]            @default([])
+  planningSummary    Json?
+  latestProfileInput Json?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stages    InterviewPlanStage[]
+  rounds    InterviewRound[]
+  reports   InterviewInsightReport[]
+  agentRuns InterviewAgentRun[]
+
+  @@index([userId, status])
+  @@index([mode, status])
+}
+
+model UserInterviewTemplate {
+  id                   String   @id @default(cuid())
+  userId               String
+  name                 String
+  flowMode             String   @default("stage")
+  resumeText           String?
+  companyName          String?
+  roleName             String?
+  targetLevel          String?
+  focusKeyword         String?
+  interviewIntensity   String?
+  mode                 String?
+  limitType            String?
+  questionLimit        Int?
+  durationLimitMinutes Int?
+  interviewerName      String?
+  interviewerStyle     String?
+  portraitUrl          String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([userId, flowMode, updatedAt])
+  @@unique([userId, name, flowMode])
+  @@map("user_interview_templates")
+}
+
+model InterviewPlanStage {
+  id                      String               @id @default(cuid())
+  planId                  String
+  stageType               InterviewStageType
+  stageLabel              String
+  stageOrder              Int
+  status                  InterviewStageStatus @default(PENDING)
+  scheduledAt             DateTime?
+  interviewerStyle        String?
+  expectedDurationMinutes Int?
+  questionBudget          Int?
+  codingRequired          Boolean              @default(false)
+  strategySummary         String?
+  stageConfig             Json?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  plan      InterviewPlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  rounds    InterviewRound[]
+  questions InterviewQuestionRecord[]
+  agentRuns InterviewAgentRun[]
+
+  @@unique([planId, stageOrder])
+  @@index([planId, status])
+}
+
+model InterviewExperienceCollectionTask {
+  id                String                            @id @default(cuid())
+  userId            String
+  companyName       String
+  roleName          String
+  status            InterviewExperienceCollectionStatus @default(PENDING)
+  progress          Int                               @default(0)
+  currentStep       String?
+  summary           String?
+  resultSummary     Json?
+  errorMessage      String?
+  latestSourceCount Int                               @default(0)
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime                          @default(now())
+  updatedAt         DateTime                          @updatedAt
+
+  user     User                               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  insights InterviewExperienceInsight[]
+
+  @@index([userId, status])
+  @@index([companyName, roleName, createdAt])
+}
+
+model InterviewExperienceInsight {
+  id             String             @id @default(cuid())
+  taskId         String
+  stageType      InterviewStageType
+  title          String
+  summary        String
+  tags           String[]           @default([])
+  sourceLabel    String?
+  freshnessLabel String?
+  evidenceUrl    String?
+  sortOrder      Int                @default(0)
+  createdAt      DateTime           @default(now())
+
+  task InterviewExperienceCollectionTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, sortOrder])
+}
+
+model InterviewRound {
+  id                   String               @id @default(cuid())
+  planId               String
+  stageId              String
+  userId               String
+  status               InterviewRoundStatus @default(PENDING)
+  roundMode            String?
+  startedAt            DateTime?
+  endedAt              DateTime?
+  currentQuestionIndex Int                  @default(0)
+  totalQuestionCount   Int                  @default(0)
+  roundSummary         String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  plan           InterviewPlan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  stage          InterviewPlanStage        @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions      InterviewQuestionRecord[]
+  answers        InterviewAnswerRecord[]
+  codingSessions CodingSession[]
+  scorecards     InterviewScorecard[]
+  reports        InterviewInsightReport[]
+  agentRuns      InterviewAgentRun[]
+
+  @@index([planId, status])
+  @@index([stageId, status])
+  @@index([userId, createdAt])
+}
+
+model InterviewQuestionRecord {
+  id            String                  @id @default(cuid())
+  roundId       String
+  stageId       String?
+  questionOrder Int
+  kind          InterviewQuestionKind
+  status        InterviewQuestionStatus @default(PENDING)
+  title         String?
+  prompt        String
+  sourceType    String?
+  sourceRef     String?
+  askedByRole   AgentRunRole?
+  rubric        Json?
+  questionMeta  Json?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  round          InterviewRound          @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  stage          InterviewPlanStage?     @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  answers        InterviewAnswerRecord[]
+  codingSessions CodingSession[]
+  scorecards     InterviewScorecard[]
+
+  @@unique([roundId, questionOrder])
+  @@index([stageId])
+  @@index([kind, status])
+}
+
+model InterviewAnswerRecord {
+  id                String   @id @default(cuid())
+  roundId           String
+  questionId        String
+  role              String
+  contentText       String?
+  transcriptText    String?
+  answerLanguage    String?
+  durationSeconds   Int?
+  hintUsedCount     Int      @default(0)
+  interruptionCount Int      @default(0)
+  answerMeta        Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  round    InterviewRound          @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  question InterviewQuestionRecord @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([roundId, createdAt])
+  @@index([questionId])
+}
+
+model CodingSession {
+  id           String              @id @default(cuid())
+  roundId      String
+  questionId   String
+  userId       String
+  language     String
+  status       CodingSessionStatus @default(READY)
+  starterCode  String?
+  latestCode   String?
+  runCount     Int                 @default(0)
+  submitCount  Int                 @default(0)
+  lastRunAt    DateTime?
+  lastSubmitAt DateTime?
+  codingMeta   Json?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  round       InterviewRound          @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  question    InterviewQuestionRecord @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissions CodingSubmission[]
+
+  @@index([roundId, status])
+  @@index([userId, createdAt])
+}
+
+model CodingSubmission {
+  id              String   @id @default(cuid())
+  codingSessionId String
+  actionType      String
+  codeSnapshot    String?
+  resultPayload   Json?
+  passedCount     Int?
+  totalCount      Int?
+  runtimeMs       Int?
+  memoryKb        Int?
+  createdAt       DateTime @default(now())
+
+  codingSession CodingSession @relation(fields: [codingSessionId], references: [id], onDelete: Cascade)
+
+  @@index([codingSessionId, createdAt])
+}
+
+model InterviewScorecard {
+  id                 String   @id @default(cuid())
+  roundId            String
+  questionId         String?
+  totalScore         Float?
+  technicalScore     Float?
+  communicationScore Float?
+  codingScore        Float?
+  confidenceScore    Float?
+  rubricBreakdown    Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  round    InterviewRound           @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  question InterviewQuestionRecord? @relation(fields: [questionId], references: [id], onDelete: SetNull)
+
+  @@index([roundId])
+  @@index([questionId])
+}
+
+model InterviewInsightReport {
+  id            String   @id @default(cuid())
+  planId        String?
+  roundId       String
+  reportType    String
+  summary       String?
+  highlights    Json?
+  risks         Json?
+  actionItems   Json?
+  radarSnapshot Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  plan  InterviewPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  round InterviewRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([roundId, reportType])
+}
+
+model InterviewAgentRun {
+  id           String         @id @default(cuid())
+  planId       String?
+  stageId      String?
+  roundId      String?
+  agentRole    AgentRunRole
+  status       AgentRunStatus @default(PENDING)
+  modelName    String?
+  input        Json?
+  output       Json?
+  errorMessage String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  createdAt    DateTime       @default(now())
+
+  plan  InterviewPlan?      @relation(fields: [planId], references: [id], onDelete: SetNull)
+  stage InterviewPlanStage? @relation(fields: [stageId], references: [id], onDelete: SetNull)
+  round InterviewRound?     @relation(fields: [roundId], references: [id], onDelete: SetNull)
+
+  @@index([agentRole, status])
+  @@index([planId])
+  @@index([stageId])
+  @@index([roundId])
+}
+
+model ReviewSnapshot {
+  id                String                @id @default(cuid())
+  userId            String
+  timeRange         String
+  interviewType     String?
+  role              String?
+  company           String?
+  dimension         String?
+  sampleStatus      String?
+  snapshotFingerprint String
+  headline          String?
+  trendSummary      String?
+  confidenceLevel   ReviewConfidenceLevel @default(LOW)
+  confidenceScore   Float                 @default(0)
+  validSampleCount  Int                   @default(0)
+  invalidSampleCount Int                  @default(0)
+  sampleCoverage    Float?
+  timeCoverage      Float?
+  dimensionCoverage Float?
+  filters           Json?
+  headlineCard      Json?
+  todayActionCard   Json?
+  confidenceCard    Json?
+  sampleSummaryCard Json?
+  metrics           Json?
+  progressOverview  Json?
+  comparisonGroups  Json?
+  agentTrace        Json?
+  generatedAt       DateTime              @default(now())
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issues     ReviewIssue[]
+  evidences  ReviewEvidence[]
+  actions    ReviewAction[]
+
+  @@index([userId, generatedAt])
+  @@index([snapshotFingerprint])
+}
+
+model ReviewIssue {
+  id                   String            @id @default(cuid())
+  snapshotId           String
+  issueKey             String?
+  name                 String
+  category             String
+  severity             String
+  frequency            Int               @default(1)
+  stability            Float?
+  impactScore          Float?
+  summary              String
+  rootCause            String?
+  latestSeenAt         DateTime?
+  status               ReviewIssueStatus @default(ACTIVE)
+  relatedDimensionKeys String[]          @default([])
+  recommendedActionIds String[]          @default([])
+  rootCauseTree        Json?
+  impactAnalysis       Json?
+  evidenceSummary      Json?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  snapshot  ReviewSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  evidences ReviewEvidence[]
+  actions   ReviewAction[]
+
+  @@index([snapshotId, severity])
+  @@index([issueKey])
+}
+
+model ReviewEvidence {
+  id             String               @id @default(cuid())
+  snapshotId     String
+  issueId        String?
+  sessionId      String?
+  sessionType    String?
+  sessionCreatedAt DateTime?
+  sampleValidity ReviewSampleValidity @default(VALID)
+  role           String?
+  company        String?
+  questionId     String?
+  questionTitle  String?
+  messageId      String?
+  excerpt        String
+  reason         String?
+  dimension      String?
+  confidence     Float?
+  severity       String?
+  evidenceContext Json?
+  rewriteSuggestion Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  snapshot ReviewSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  issue    ReviewIssue?   @relation(fields: [issueId], references: [id], onDelete: SetNull)
+
+  @@index([snapshotId])
+  @@index([issueId])
+  @@index([sessionId])
+}
+
+model ReviewAction {
+  id                       String               @id @default(cuid())
+  snapshotId               String
+  issueId                  String?
+  title                    String
+  description              String
+  whyThisAction            String?
+  actionType               String
+  recommendedMode          String?
+  recommendedQuestionTypes String[]             @default([])
+  recommendedDifficulty    String?
+  targetPath               String?
+  targetPayload            Json?
+  successMetric            String?
+  expectedOutcome          String?
+  estimatedEffort          String?
+  priority                 ReviewActionPriority @default(TODAY)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+
+  snapshot   ReviewSnapshot          @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  issue      ReviewIssue?            @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  executions ReviewActionExecution[]
+
+  @@index([snapshotId, priority])
+  @@index([issueId])
+}
+
+model ReviewActionExecution {
+  id               String                      @id @default(cuid())
+  actionId         String
+  userId           String
+  startedAt        DateTime                    @default(now())
+  completedAt      DateTime?
+  resultStatus     ReviewActionExecutionStatus @default(STARTED)
+  improvementScore Float?
+  notes            String?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  action ReviewAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([actionId, startedAt])
+  @@index([userId, startedAt])
 }
 
 model KnowledgeDocument {
@@ -136,14 +863,14 @@ model KnowledgeBase {
 }
 
 model Category {
-  id          String @id @default(cuid())
-  kbId        String
+  id            String        @id @default(cuid())
+  kbId          String
   knowledgeBase KnowledgeBase @relation(fields: [kbId], references: [id], onDelete: Cascade)
-  name        String
-  description String?
-  sortOrder   Int    @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  name          String
+  description   String?
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   questions Question[]
 
@@ -151,25 +878,25 @@ model Category {
 }
 
 model Question {
-  id          String   @id @default(cuid())
-  kbId        String
-  knowledgeBase KnowledgeBase @relation(fields: [kbId], references: [id], onDelete: Cascade)
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  title       String
-  difficulty  QuestionDifficulty @default(medium)
-  tags        String[] @default([])
-  answerKeyPoints     String[] @default([])
-  answerDetailed      String   @default("")
-  answerCodeExample   String?
-  answerDiagram       String?
-  relatedQuestionIds  String[] @default([])
-  interviewFrequency  InterviewFrequency @default(medium)
-  sourceUrl   String?
-  status      QuestionStatus @default(draft)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  publishedAt DateTime?
+  id                 String             @id @default(cuid())
+  kbId               String
+  knowledgeBase      KnowledgeBase      @relation(fields: [kbId], references: [id], onDelete: Cascade)
+  categoryId         String
+  category           Category           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title              String
+  difficulty         QuestionDifficulty @default(medium)
+  tags               String[]           @default([])
+  answerKeyPoints    String[]           @default([])
+  answerDetailed     String             @default("")
+  answerCodeExample  String?
+  answerDiagram      String?
+  relatedQuestionIds String[]           @default([])
+  interviewFrequency InterviewFrequency @default(medium)
+  sourceUrl          String?
+  status             QuestionStatus     @default(draft)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  publishedAt        DateTime?
 
   progress UserQuestionProgress[]
 
@@ -180,20 +907,20 @@ model Question {
 }
 
 model UserQuestionProgress {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  questionId  String
-  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  viewed      Boolean  @default(false)
-  attempted   Boolean  @default(false)
-  correct     Boolean  @default(false)
-  mastered    Boolean  @default(false)
-  bookmarked  Boolean  @default(false)
-  attemptCount Int     @default(0)
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId    String
+  question      Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  viewed        Boolean   @default(false)
+  attempted     Boolean   @default(false)
+  correct       Boolean   @default(false)
+  mastered      Boolean   @default(false)
+  bookmarked    Boolean   @default(false)
+  attemptCount  Int       @default(0)
   lastAttemptAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@unique([userId, questionId])
   @@index([userId])
@@ -216,26 +943,26 @@ model TopicCategory {
 }
 
 model TopicBank {
-  id             String    @id @default(cuid())
-  name           String
-  slug           String    @unique
-  description    String?
-  categoryId     String
-  targetRole     String?
-  difficulty     String?
-  status         String    @default("DRAFT")
-  coverUrl       String?
-  sortOrder      Int       @default(0)
-  isFeatured     Boolean   @default(false)
-  documentCount  Int       @default(0)
-  questionCount  Int       @default(0)
-  publishedAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  description   String?
+  categoryId    String
+  targetRole    String?
+  difficulty    String?
+  status        String    @default("DRAFT")
+  coverUrl      String?
+  sortOrder     Int       @default(0)
+  isFeatured    Boolean   @default(false)
+  documentCount Int       @default(0)
+  questionCount Int       @default(0)
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  category   TopicCategory @relation(fields: [categoryId], references: [id])
-  chapters   Chapter[]
-  documents  Document[]
+  category  TopicCategory @relation(fields: [categoryId], references: [id])
+  chapters  Chapter[]
+  documents Document[]
 
   @@index([categoryId])
   @@index([status])
@@ -243,13 +970,13 @@ model TopicBank {
 }
 
 model Chapter {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   topicBankId String
   name        String
   slug        String
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   topicBank TopicBank  @relation(fields: [topicBankId], references: [id], onDelete: Cascade)
   documents Document[]
@@ -278,18 +1005,18 @@ model Document {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  topicBank        TopicBank                  @relation(fields: [topicBankId], references: [id], onDelete: Cascade)
-  chapter          Chapter?                   @relation(fields: [chapterId], references: [id], onDelete: SetNull)
-  versions         DocumentVersion[]
-  tags             DocumentTag[]
-  favorites        Favorite[]
-  progress         LearningProgress[]
+  topicBank         TopicBank                  @relation(fields: [topicBankId], references: [id], onDelete: Cascade)
+  chapter           Chapter?                   @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  versions          DocumentVersion[]
+  tags              DocumentTag[]
+  favorites         Favorite[]
+  progress          LearningProgress[]
   interviewSessions DocumentInterviewSession[]
-  answerScores     UserAnswerScore[]
-  qualityReports   QualityReport[]
-  reviewTasks      ReviewTask[]
-  feedbacks        Feedback[]
-  sourceMaterials  SourceMaterial[]
+  answerScores      UserAnswerScore[]
+  qualityReports    QualityReport[]
+  reviewTasks       ReviewTask[]
+  feedbacks         Feedback[]
+  sourceMaterials   SourceMaterial[]
 
   @@unique([topicBankId, slug])
   @@index([topicBankId])
@@ -299,18 +1026,18 @@ model Document {
 }
 
 model DocumentVersion {
-  id               String    @id @default(cuid())
+  id               String   @id @default(cuid())
   documentId       String
-  version          Int       @default(1)
+  version          Int      @default(1)
   learningContent  Json?
   interviewContent Json?
   markdownContent  String?
   sourceSnapshot   Json?
   qualityReportId  String?
   createdBy        String?
-  createdByType    String    @default("ai")
+  createdByType    String   @default("ai")
   changeLog        String?
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime @default(now())
 
   document      Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
   qualityReport QualityReport? @relation(fields: [qualityReportId], references: [id])

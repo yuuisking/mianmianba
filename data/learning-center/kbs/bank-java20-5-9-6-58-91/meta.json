@@ -1,0 +1,22 @@
+{
+  "id": "bank-java20-5-9-6-58-91",
+  "name": "Java 并发题库",
+  "subtitle": "Java 并发 高频面试题库",
+  "tags": [
+    "Java 并发",
+    "线程",
+    "锁",
+    "JUC",
+    "线程池"
+  ],
+  "updatedAt": "2026-05-09",
+  "stats": {
+    "topics": 14,
+    "paths": 4
+  },
+  "description": "覆盖线程模型、可见性、有序性、锁和线程池，是 Java 并发最常见的考点集合。",
+  "visibility": "public",
+  "sortOrder": 0,
+  "cover": "J",
+  "defaultTopicId": null
+}

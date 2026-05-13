@@ -1,0 +1,323 @@
+{
+  "kbId": "bank-mysql",
+  "topicId": "mysql20-4-8-58-120acid20-698-5-682-4-95-4-9-8-81-79-84-9",
+  "subjectId": "2-4-8-58-1-4-88-99481",
+  "updatedAt": "2026-05-09",
+  "content": {
+    "title": "MySQL 事务 ACID 是如何保证的？",
+    "breadcrumb": [
+      "MySQL题库",
+      "事务与锁",
+      "MySQL 事务 ACID 是如何保证的？"
+    ],
+    "quickFacts": [
+      {
+        "k": "知识点",
+        "v": "MySQL 事务 ACID 是如何保证的？"
+      },
+      {
+        "k": "所属模块",
+        "v": "事务与锁"
+      },
+      {
+        "k": "题库主题",
+        "v": "MySQL"
+      },
+      {
+        "k": "难度",
+        "v": "中等"
+      },
+      {
+        "k": "面试频率",
+        "v": "高频"
+      },
+      {
+        "k": "核心关键词",
+        "v": "ACID / redo log / undo log / 锁 / MVCC / 持久化"
+      }
+    ],
+    "sections": [
+      {
+        "id": "knowledge-summary",
+        "h2": "知识点总结",
+        "paragraphs": [
+          "MySQL 事务 ACID 不是一个单点能力，而是由 undo log、redo log、锁、MVCC 和约束共同保证的工程组合。",
+          "事务像一次转账合同：要么全做完，要么撤回；做完不能丢；别人不能看到中间态；最终账目必须符合规则。"
+        ],
+        "bullets": [
+          "原子性依赖 undo log 回滚",
+          "持久性依赖 redo log",
+          "隔离性依赖锁和 MVCC",
+          "一致性由前三者加约束共同支撑"
+        ]
+      },
+      {
+        "id": "interview-highlights",
+        "h2": "面试常问",
+        "paragraphs": [],
+        "bullets": [
+          "undo log 和 redo log 最大区别是什么？",
+          "一致性为什么不是单靠数据库自动保证？",
+          "面试官问到「MySQL 事务 ACID 是如何保证的」时，30 秒内应该先给出什么结论？",
+          "如果继续追问原理，应该补充哪些关键机制和边界条件？",
+          "在真实项目里，什么场景会用到这个知识点，怎么说明取舍？",
+          "这个问题最容易答错的误区是什么，应该如何纠正？"
+        ],
+        "callout": "面试模式下建议先给 30 秒结论，再按原理、边界、项目场景逐层展开。"
+      },
+      {
+        "id": "reference-answer",
+        "h2": "参考答案和解析",
+        "paragraphs": [
+          "MySQL 事务 ACID 由多套机制共同保证：原子性靠 undo log 回滚，持久性靠 redo log 崩溃恢复，隔离性靠锁和 MVCC，一致性则由数据库约束、业务规则以及 AID 共同支撑。",
+          "以转账为例，扣款和加款必须放在同一个事务里。执行前，undo log 会记录旧值，所以失败时可以回滚；提交后，redo log 能在宕机恢复时重放已提交修改；并发执行时，普通查询通过 MVCC 看到一致快照，写冲突和当前读由锁控制；再加上主键、唯一、外键、非空等约束，最终保证事务前后数据满足规则。",
+          "高级回答可以补 WAL 思想和两阶段提交。InnoDB 先写日志再落盘，避免每次提交都同步刷完整数据页；如果涉及 binlog，还要通过 redo log 和 binlog 的两阶段提交保证恢复后两类日志一致。",
+          "30 秒回答：先说明「MySQL 事务 ACID 是如何保证的？」解决什么问题，再给出最核心的机制或结论。",
+          "1 分钟回答：继续按“定义和目标 -> 原理机制 -> 典型场景 -> 边界误区”的顺序展开，让答案既完整又容易复述。",
+          "深入追问：如果面试官继续问项目经验，要补充真实场景、方案取舍、风险控制和线上排查思路。"
+        ],
+        "bullets": [
+          "undo log 负责回滚",
+          "redo log 负责持久化恢复",
+          "锁和 MVCC 负责隔离",
+          "一致性需要数据库约束和业务规则"
+        ]
+      }
+    ],
+    "examPoint": "先说明事务要保证什么，再把 A、C、I、D 分别落到 MySQL 的日志、锁和约束机制。",
+    "summary": "MySQL 事务 ACID 不是一个单点能力，而是由 undo log、redo log、锁、MVCC 和约束共同保证的工程组合。",
+    "scenario": "用户 A 给用户 B 转账，扣款成功后服务宕机。如果没有事务和日志机制，可能出现 A 扣了钱但 B 没收到，或者重启后已提交的数据丢失。",
+    "article": {
+      "conclusion": "MySQL 事务 ACID 不是一个单点能力，而是由 undo log、redo log、锁、MVCC 和约束共同保证的工程组合。",
+      "keyTakeaways": [
+        "原子性依赖 undo log 回滚",
+        "持久性依赖 redo log",
+        "隔离性依赖锁和 MVCC",
+        "一致性由前三者加约束共同支撑"
+      ],
+      "learningGoals": [
+        "ACID 四个字母分别是什么？",
+        "undo log 和 redo log 分别负责什么？",
+        "为什么一致性不是某一个单独组件保证的？"
+      ],
+      "plainSummary": "事务像一次转账合同：要么全做完，要么撤回；做完不能丢；别人不能看到中间态；最终账目必须符合规则。",
+      "plainRetell": "我会先说 ACID 是事务的四个目标，再逐个落地：A 靠 undo 回滚，D 靠 redo 恢复，I 靠锁和 MVCC，C 是约束和前三者共同保证。最后用转账场景说明为什么不能只成功一半。",
+      "strongSummary": "ACID 题要避免背概念，要把四个特性分别映射到 MySQL 的日志、锁、MVCC 和约束体系。",
+      "sections": [
+        {
+          "id": "scenario",
+          "h2": "一、先从真实场景开始",
+          "paragraphs": [
+            "用户 A 给用户 B 转账，扣款成功后服务宕机。如果没有事务和日志机制，可能出现 A 扣了钱但 B 没收到，或者重启后已提交的数据丢失。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "先建立问题动机，再进入原理推导。"
+        },
+        {
+          "id": "why",
+          "h2": "二、核心原理为什么成立",
+          "paragraphs": [
+            "原子性要求一组操作要么全部成功，要么全部回滚，undo log 保存回滚需要的旧值。",
+            "持久性要求提交后的修改崩溃后仍可恢复，redo log 记录物理页修改用于 crash recovery。",
+            "隔离性要求并发事务互不随意干扰，普通读靠 MVCC，当前读和写冲突靠锁。",
+            "一致性是业务约束、数据库约束、原子性、隔离性和持久性共同作用后的结果。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "每个结论都要解释为什么，不能停在概念层面。"
+        },
+        {
+          "id": "diagram",
+          "h2": "三、结构图解",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "diagram",
+          "highlight": "图解只承担辅助理解，不用为了有图而强行 Mermaid。",
+          "diagramCode": "事务提交链路\n├─ 执行前：undo log 记录旧值\n├─ 执行中：锁/MVCC 控制并发可见性\n├─ 提交时：redo log 保证崩溃恢复\n└─ 约束校验：主键/外键/唯一/业务规则保持一致",
+          "diagramType": "ascii-tree",
+          "fallbackDescription": "事务提交链路\n├─ 执行前：undo log 记录旧值\n├─ 执行中：锁/MVCC 控制并发可见性\n├─ 提交时：redo log 保证崩溃恢复\n└─ 约束校验：主键/外键/唯一/业务规则保持一致"
+        },
+        {
+          "id": "comparison",
+          "h2": "四、对比分析",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "comparison",
+          "highlight": "对比题必须让用户知道为什么不用另一个方案。",
+          "comparison": {
+            "title": "ACID 与 MySQL 机制对应",
+            "headers": [
+              "特性",
+              "含义",
+              "主要机制",
+              "面试提醒"
+            ],
+            "rows": [
+              [
+                "Atomicity",
+                "要么全成要么全回滚",
+                "undo log",
+                "别把 undo 和 redo 混淆"
+              ],
+              [
+                "Consistency",
+                "事务前后满足约束",
+                "约束 + AID + 业务规则",
+                "不是单一组件"
+              ],
+              [
+                "Isolation",
+                "并发事务互相隔离",
+                "锁 + MVCC",
+                "要区分快照读和当前读"
+              ],
+              [
+                "Durability",
+                "提交后不丢",
+                "redo log + WAL",
+                "重点讲崩溃恢复"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "code",
+          "h2": "五、代码或命令示例",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "code",
+          "highlight": "代码示例要能解释观察点，而不是只展示语法。",
+          "codeExample": {
+            "title": "转账事务示例",
+            "language": "sql",
+            "code": "START TRANSACTION;\nUPDATE account SET balance = balance - 100 WHERE id = 1;\nUPDATE account SET balance = balance + 100 WHERE id = 2;\nCOMMIT;",
+            "explanation": "如果第二条失败，事务可以回滚到执行前；如果 COMMIT 后宕机，redo log 负责恢复已提交修改。"
+          }
+        },
+        {
+          "id": "mistake",
+          "h2": "六、常见误区",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "mistake",
+          "highlight": "误区要指出为什么错，以及正确边界是什么。",
+          "mistake": {
+            "mistake": "redo log 是用来回滚事务的。",
+            "whyWrong": "redo log 主要用于崩溃恢复，保证已提交修改可重放；回滚依赖的是 undo log。",
+            "correct": "回答时要明确：undo 管回滚和历史版本，redo 管提交后的持久化恢复。"
+          }
+        }
+      ]
+    },
+    "selfTests": [
+      {
+        "level": "基础",
+        "question": "ACID 四个字母分别是什么？",
+        "hint": "先说问题本质，再说关键机制。",
+        "answer": "MySQL 事务 ACID 由多套机制共同保证：原子性靠 undo log 回滚，持久性靠 redo log 崩溃恢复，隔离性靠锁和 MVCC，一致性则由数据库约束、业务规则以及 AID 共同支撑。",
+        "gradingCriteria": [
+          {
+            "criterion": "核心结论准确",
+            "points": 40,
+            "description": "能说出问题本质和关键机制。"
+          },
+          {
+            "criterion": "能解释为什么",
+            "points": 40,
+            "description": "不是只背名词，而是能解释设计原因。"
+          },
+          {
+            "criterion": "表达清晰",
+            "points": 20,
+            "description": "回答有结论和层次。"
+          }
+        ]
+      },
+      {
+        "level": "应用",
+        "question": "如果放到真实项目里，你会怎么判断该方案是否合适？",
+        "hint": "从场景、风险、监控和兜底四个角度想。",
+        "answer": "我会先说 ACID 是事务的四个目标，再逐个落地：A 靠 undo 回滚，D 靠 redo 恢复，I 靠锁和 MVCC，C 是约束和前三者共同保证。最后用转账场景说明为什么不能只成功一半。",
+        "gradingCriteria": [
+          {
+            "criterion": "场景匹配",
+            "points": 35,
+            "description": "能说明适用条件。"
+          },
+          {
+            "criterion": "风险意识",
+            "points": 35,
+            "description": "能指出边界和误区。"
+          },
+          {
+            "criterion": "工程表达",
+            "points": 30,
+            "description": "能落到项目验证或排查。"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "MySQL 8.4 Reference Manual",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/",
+        "type": "官方文档",
+        "trustLevel": "S"
+      }
+    ],
+    "interviewContent": {
+      "question": "MySQL 事务 ACID 是如何保证的？",
+      "questionVariants": [
+        "你能讲一下MySQL 事务 ACID 是如何保证的吗？",
+        "如果面试官继续追问这个问题，你会从哪些维度展开？"
+      ],
+      "answer30s": "MySQL 事务 ACID 由多套机制共同保证：原子性靠 undo log 回滚，持久性靠 redo log 崩溃恢复，隔离性靠锁和 MVCC，一致性则由数据库约束、业务规则以及 AID 共同支撑。",
+      "answer2min": "以转账为例，扣款和加款必须放在同一个事务里。执行前，undo log 会记录旧值，所以失败时可以回滚；提交后，redo log 能在宕机恢复时重放已提交修改；并发执行时，普通查询通过 MVCC 看到一致快照，写冲突和当前读由锁控制；再加上主键、唯一、外键、非空等约束，最终保证事务前后数据满足规则。",
+      "advancedAnswer": "高级回答可以补 WAL 思想和两阶段提交。InnoDB 先写日志再落盘，避免每次提交都同步刷完整数据页；如果涉及 binlog，还要通过 redo log 和 binlog 的两阶段提交保证恢复后两类日志一致。",
+      "essentialPoints": [
+        {
+          "point": "undo log 负责回滚"
+        },
+        {
+          "point": "redo log 负责持久化恢复"
+        },
+        {
+          "point": "锁和 MVCC 负责隔离"
+        },
+        {
+          "point": "一致性需要数据库约束和业务规则"
+        }
+      ],
+      "bonusPoints": [
+        {
+          "point": "undo 记录逻辑旧值用于回滚和版本链，redo 记录页修改用于崩溃恢复。",
+          "why": "undo log 和 redo log 最大区别是什么？"
+        },
+        {
+          "point": "数据库约束只能覆盖部分规则，复杂业务不变量还要靠正确事务边界和业务校验。",
+          "why": "一致性为什么不是单靠数据库自动保证？"
+        }
+      ],
+      "advancedPoints": [],
+      "deductPoints": [
+        {
+          "point": "redo log 是用来回滚事务的。",
+          "why": "redo log 主要用于崩溃恢复，保证已提交修改可重放；回滚依赖的是 undo log。"
+        }
+      ],
+      "followUps": [
+        {
+          "question": "undo log 和 redo log 最大区别是什么？",
+          "difficulty": "medium",
+          "keyAnswer": "undo 记录逻辑旧值用于回滚和版本链，redo 记录页修改用于崩溃恢复。"
+        },
+        {
+          "question": "一致性为什么不是单靠数据库自动保证？",
+          "difficulty": "hard",
+          "keyAnswer": "数据库约束只能覆盖部分规则，复杂业务不变量还要靠正确事务边界和业务校验。"
+        }
+      ]
+    }
+  }
+}

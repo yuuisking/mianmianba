@@ -1,0 +1,22 @@
+{
+  "id": "bank-javascript",
+  "name": "JavaScript题库",
+  "subtitle": "JavaScript 高频面试题库",
+  "tags": [
+    "JavaScript",
+    "作用域",
+    "事件循环",
+    "Promise",
+    "原型链"
+  ],
+  "updatedAt": "2026-05-09",
+  "stats": {
+    "topics": 13,
+    "paths": 4
+  },
+  "description": "覆盖作用域、原型链、事件循环、Promise 和对象机制，是前端核心基础题库。",
+  "visibility": "public",
+  "sortOrder": 0,
+  "cover": "J",
+  "defaultTopicId": null
+}

@@ -1,0 +1,318 @@
+{
+  "kbId": "bank-redis",
+  "topicId": "redis20-5-682-4-95-5-9-78-0-6-91-58-8-7-97-58-3-99990-6-581-9",
+  "subjectId": "3-7-93-5-98-5-9-8-7-5",
+  "updatedAt": "2026-05-09",
+  "content": {
+    "title": "Redis 如何实现滑动窗口限流？",
+    "breadcrumb": [
+      "Redis题库",
+      "缓存实践",
+      "Redis 如何实现滑动窗口限流？"
+    ],
+    "quickFacts": [
+      {
+        "k": "知识点",
+        "v": "Redis 如何实现滑动窗口限流？"
+      },
+      {
+        "k": "所属模块",
+        "v": "缓存实践"
+      },
+      {
+        "k": "题库主题",
+        "v": "Redis"
+      },
+      {
+        "k": "难度",
+        "v": "困难"
+      },
+      {
+        "k": "面试频率",
+        "v": "高频"
+      },
+      {
+        "k": "核心关键词",
+        "v": "ZSet / 滑动窗口 / 限流 / 时间戳 / Lua / 原子性"
+      }
+    ],
+    "sections": [
+      {
+        "id": "knowledge-summary",
+        "h2": "知识点总结",
+        "paragraphs": [
+          "Redis 实现滑动窗口限流，常见做法是用 ZSet 按时间戳记录请求，先删除窗口外数据，再统计窗口内数量，超过阈值就拒绝。",
+          "固定窗口像每分钟清零一次，边界处可能瞬间放过两倍流量；滑动窗口像一直盯着最近 60 秒，只要最近 60 秒请求超了，就不再放行。"
+        ],
+        "bullets": [
+          "ZSet score 存时间戳",
+          "每次请求清理窗口外记录",
+          "ZCARD 统计当前窗口请求数",
+          "Lua 脚本保证检查和写入原子性"
+        ]
+      },
+      {
+        "id": "interview-highlights",
+        "h2": "面试常问",
+        "paragraphs": [],
+        "bullets": [
+          "滑动窗口和令牌桶怎么选？",
+          "ZSet 滑动窗口有什么性能风险？",
+          "面试官问到「Redis 如何实现滑动窗口限流」时，30 秒内应该先给出什么结论？",
+          "如果继续追问原理，应该补充哪些关键机制和边界条件？",
+          "在真实项目里，什么场景会用到这个知识点，怎么说明取舍？",
+          "这个问题最容易答错的误区是什么，应该如何纠正？"
+        ],
+        "callout": "面试模式下建议先给 30 秒结论，再按原理、边界、项目场景逐层展开。"
+      },
+      {
+        "id": "reference-answer",
+        "h2": "参考答案和解析",
+        "paragraphs": [
+          "Redis 滑动窗口限流通常用 ZSet：score 存请求时间戳，每次请求清理窗口外数据，统计窗口内数量，未超过阈值才写入。为了避免并发竞态，检查和写入最好放到 Lua 脚本里。",
+          "固定窗口最大问题是边界突刺。比如每分钟限 100 次，用户在上一分钟最后一秒和下一分钟第一秒各打 100 次，瞬间就可能有 200 次。滑动窗口按当前时间回看最近 N 秒，更平滑。Redis 里可以用 ZSet，score 是时间戳，member 是请求 id。每次请求先 ZREMRANGEBYSCORE 清理过期记录，再 ZCARD 统计数量，没超限再 ZADD 写入，并设置过期时间。为了保证原子性，这几步通常用 Lua。",
+          "高级回答要补成本和替代方案。ZSet 每次请求都有写入和清理，热点用户或热点接口下要关注内存、key 过期和脚本耗时。网关全局限流也可以考虑令牌桶或漏桶；滑动窗口更适合用户级、接口级精细限流。",
+          "30 秒回答：先说明「Redis 如何实现滑动窗口限流？」解决什么问题，再给出最核心的机制或结论。",
+          "深入追问：如果面试官继续问项目经验，要补充真实场景、方案取舍、风险控制和线上排查思路。"
+        ],
+        "bullets": [
+          "固定窗口边界问题",
+          "ZSet 时间戳建模",
+          "清理、统计、写入流程",
+          "Lua 原子性"
+        ]
+      }
+    ],
+    "examPoint": "先讲固定窗口的问题，再讲滑动窗口如何用时间范围保留最近一段请求。",
+    "summary": "Redis 实现滑动窗口限流，常见做法是用 ZSet 按时间戳记录请求，先删除窗口外数据，再统计窗口内数量，超过阈值就拒绝。",
+    "scenario": "登录、短信验证码、下单接口都需要限制用户在一段时间内的请求次数。如果只用固定分钟窗口，用户可能在 12:00:59 和 12:01:00 连续打满两轮请求。",
+    "article": {
+      "conclusion": "Redis 实现滑动窗口限流，常见做法是用 ZSet 按时间戳记录请求，先删除窗口外数据，再统计窗口内数量，超过阈值就拒绝。",
+      "keyTakeaways": [
+        "ZSet score 存时间戳",
+        "每次请求清理窗口外记录",
+        "ZCARD 统计当前窗口请求数",
+        "Lua 脚本保证检查和写入原子性"
+      ],
+      "learningGoals": [
+        "滑动窗口比固定窗口好在哪里？",
+        "ZSet 为什么适合做滑动窗口？",
+        "为什么要用 Lua？"
+      ],
+      "plainSummary": "固定窗口像每分钟清零一次，边界处可能瞬间放过两倍流量；滑动窗口像一直盯着最近 60 秒，只要最近 60 秒请求超了，就不再放行。",
+      "plainRetell": "我会先说固定窗口有边界突刺，再讲用 ZSet 存最近窗口内每次请求的时间戳。每次请求先删掉窗口外记录，再统计数量，没超过阈值就写入。因为这些操作要原子完成，所以通常用 Lua 脚本。",
+      "strongSummary": "滑动窗口题要讲清窗口边界、ZSet 时间戳、Lua 原子性和线上成本，不能只说 Redis 计数。",
+      "sections": [
+        {
+          "id": "scenario",
+          "h2": "一、先从真实场景开始",
+          "paragraphs": [
+            "登录、短信验证码、下单接口都需要限制用户在一段时间内的请求次数。如果只用固定分钟窗口，用户可能在 12:00:59 和 12:01:00 连续打满两轮请求。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "先建立问题动机，再进入原理推导。"
+        },
+        {
+          "id": "why",
+          "h2": "二、核心原理为什么成立",
+          "paragraphs": [
+            "滑动窗口关注的是当前时间向前回看的一段真实时间范围，比固定窗口边界更平滑。",
+            "ZSet 的 score 可以存毫秒时间戳，天然支持按时间范围删除和统计。",
+            "一次限流判断包含删除旧记录、计数、写入新记录、设置过期时间，拆开执行会有并发竞态。",
+            "Lua 脚本能让这些操作在 Redis 单线程执行上下文中原子完成。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "每个结论都要解释为什么，不能停在概念层面。"
+        },
+        {
+          "id": "diagram",
+          "h2": "三、结构图解",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "diagram",
+          "highlight": "图解只承担辅助理解，不用为了有图而强行 Mermaid。",
+          "diagramCode": "请求到达 now\n├─ ZREMRANGEBYSCORE key 0 now-window\n├─ ZCARD key 判断窗口内数量\n├─ 未超限：ZADD key now requestId\n└─ 超限：拒绝或降级",
+          "diagramType": "ascii-tree",
+          "fallbackDescription": "请求到达 now\n├─ ZREMRANGEBYSCORE key 0 now-window\n├─ ZCARD key 判断窗口内数量\n├─ 未超限：ZADD key now requestId\n└─ 超限：拒绝或降级"
+        },
+        {
+          "id": "comparison",
+          "h2": "四、对比分析",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "comparison",
+          "highlight": "对比题必须让用户知道为什么不用另一个方案。",
+          "comparison": {
+            "title": "固定窗口与滑动窗口",
+            "headers": [
+              "方案",
+              "优点",
+              "问题",
+              "适用"
+            ],
+            "rows": [
+              [
+                "固定窗口",
+                "实现简单，计数成本低",
+                "边界突刺明显",
+                "低风险后台接口"
+              ],
+              [
+                "滑动窗口",
+                "限制更平滑，真实反映最近窗口",
+                "ZSet 成本更高",
+                "登录、短信、支付等敏感接口"
+              ],
+              [
+                "令牌桶",
+                "允许一定突发，吞吐平滑",
+                "参数设计更复杂",
+                "网关流量整形"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "code",
+          "h2": "五、代码或命令示例",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "code",
+          "highlight": "代码示例要能解释观察点，而不是只展示语法。",
+          "codeExample": {
+            "title": "ZSet + Lua 滑动窗口示例",
+            "language": "lua",
+            "code": "local key = KEYS[1]\nlocal now = tonumber(ARGV[1])\nlocal window = tonumber(ARGV[2])\nlocal limit = tonumber(ARGV[3])\nredis.call('ZREMRANGEBYSCORE', key, 0, now - window)\nlocal count = redis.call('ZCARD', key)\nif count >= limit then return 0 end\nredis.call('ZADD', key, now, ARGV[4])\nredis.call('PEXPIRE', key, window)\nreturn 1",
+            "explanation": "脚本先清理窗口外请求，再判断窗口内数量，未超限才写入当前请求。用 Lua 是为了避免并发请求同时通过判断。",
+            "output": "1 表示放行，0 表示限流",
+            "outputExplanation": "线上还要记录限流原因、用户维度和接口维度，方便排查误伤。"
+          }
+        },
+        {
+          "id": "mistake",
+          "h2": "六、常见误区",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "mistake",
+          "highlight": "误区要指出为什么错，以及正确边界是什么。",
+          "mistake": {
+            "mistake": "用 INCR 计数就等于滑动窗口限流。",
+            "whyWrong": "INCR + EXPIRE 通常是固定窗口，窗口边界可能出现流量突刺。",
+            "correct": "滑动窗口要按真实时间范围统计最近一段请求，通常需要时间戳集合或更精细的分桶。"
+          }
+        }
+      ]
+    },
+    "selfTests": [
+      {
+        "level": "基础",
+        "question": "滑动窗口比固定窗口好在哪里？",
+        "hint": "先说问题本质，再说关键机制。",
+        "answer": "Redis 滑动窗口限流通常用 ZSet：score 存请求时间戳，每次请求清理窗口外数据，统计窗口内数量，未超过阈值才写入。为了避免并发竞态，检查和写入最好放到 Lua 脚本里。",
+        "gradingCriteria": [
+          {
+            "criterion": "核心结论准确",
+            "points": 40,
+            "description": "能说出问题本质和关键机制。"
+          },
+          {
+            "criterion": "能解释为什么",
+            "points": 40,
+            "description": "不是只背名词，而是能解释设计原因。"
+          },
+          {
+            "criterion": "表达清晰",
+            "points": 20,
+            "description": "回答有结论和层次。"
+          }
+        ]
+      },
+      {
+        "level": "应用",
+        "question": "如果放到真实项目里，你会怎么判断该方案是否合适？",
+        "hint": "从场景、风险、监控和兜底四个角度想。",
+        "answer": "我会先说固定窗口有边界突刺，再讲用 ZSet 存最近窗口内每次请求的时间戳。每次请求先删掉窗口外记录，再统计数量，没超过阈值就写入。因为这些操作要原子完成，所以通常用 Lua 脚本。",
+        "gradingCriteria": [
+          {
+            "criterion": "场景匹配",
+            "points": 35,
+            "description": "能说明适用条件。"
+          },
+          {
+            "criterion": "风险意识",
+            "points": 35,
+            "description": "能指出边界和误区。"
+          },
+          {
+            "criterion": "工程表达",
+            "points": 30,
+            "description": "能落到项目验证或排查。"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "Redis Documentation",
+        "url": "https://redis.io/docs/latest/",
+        "type": "官方文档",
+        "trustLevel": "S"
+      }
+    ],
+    "interviewContent": {
+      "question": "Redis 如何实现滑动窗口限流？",
+      "questionVariants": [
+        "你能讲一下Redis 如何实现滑动窗口限流吗？",
+        "如果面试官继续追问这个问题，你会从哪些维度展开？"
+      ],
+      "answer30s": "Redis 滑动窗口限流通常用 ZSet：score 存请求时间戳，每次请求清理窗口外数据，统计窗口内数量，未超过阈值才写入。为了避免并发竞态，检查和写入最好放到 Lua 脚本里。",
+      "answer2min": "固定窗口最大问题是边界突刺。比如每分钟限 100 次，用户在上一分钟最后一秒和下一分钟第一秒各打 100 次，瞬间就可能有 200 次。滑动窗口按当前时间回看最近 N 秒，更平滑。Redis 里可以用 ZSet，score 是时间戳，member 是请求 id。每次请求先 ZREMRANGEBYSCORE 清理过期记录，再 ZCARD 统计数量，没超限再 ZADD 写入，并设置过期时间。为了保证原子性，这几步通常用 Lua。",
+      "advancedAnswer": "高级回答要补成本和替代方案。ZSet 每次请求都有写入和清理，热点用户或热点接口下要关注内存、key 过期和脚本耗时。网关全局限流也可以考虑令牌桶或漏桶；滑动窗口更适合用户级、接口级精细限流。",
+      "essentialPoints": [
+        {
+          "point": "固定窗口边界问题"
+        },
+        {
+          "point": "ZSet 时间戳建模"
+        },
+        {
+          "point": "清理、统计、写入流程"
+        },
+        {
+          "point": "Lua 原子性"
+        }
+      ],
+      "bonusPoints": [
+        {
+          "point": "滑动窗口更严格看最近窗口，令牌桶更适合允许突发和流量整形。",
+          "why": "滑动窗口和令牌桶怎么选？"
+        },
+        {
+          "point": "高频写入、清理、内存增长和 Lua 脚本耗时。",
+          "why": "ZSet 滑动窗口有什么性能风险？"
+        }
+      ],
+      "advancedPoints": [],
+      "deductPoints": [
+        {
+          "point": "用 INCR 计数就等于滑动窗口限流。",
+          "why": "INCR + EXPIRE 通常是固定窗口，窗口边界可能出现流量突刺。"
+        }
+      ],
+      "followUps": [
+        {
+          "question": "滑动窗口和令牌桶怎么选？",
+          "difficulty": "medium",
+          "keyAnswer": "滑动窗口更严格看最近窗口，令牌桶更适合允许突发和流量整形。"
+        },
+        {
+          "question": "ZSet 滑动窗口有什么性能风险？",
+          "difficulty": "hard",
+          "keyAnswer": "高频写入、清理、内存增长和 Lua 脚本耗时。"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,317 @@
+{
+  "kbId": "bank-mysql",
+  "topicId": "mvcc20-698-5-682-4-95-5-9-78-0-8-58699-5-9-6-58-91-79-84-9",
+  "subjectId": "2-4-8-58-1-4-88-99481",
+  "updatedAt": "2026-05-09",
+  "content": {
+    "title": "MVCC 是如何实现读写并发的？",
+    "breadcrumb": [
+      "MySQL题库",
+      "事务与锁",
+      "MVCC 是如何实现读写并发的？"
+    ],
+    "quickFacts": [
+      {
+        "k": "知识点",
+        "v": "MVCC 是如何实现读写并发的？"
+      },
+      {
+        "k": "所属模块",
+        "v": "事务与锁"
+      },
+      {
+        "k": "题库主题",
+        "v": "MySQL"
+      },
+      {
+        "k": "难度",
+        "v": "困难"
+      },
+      {
+        "k": "面试频率",
+        "v": "高频"
+      },
+      {
+        "k": "核心关键词",
+        "v": "MVCC / undo log / Read View / 版本链 / 快照读 / 当前读"
+      }
+    ],
+    "sections": [
+      {
+        "id": "knowledge-summary",
+        "h2": "知识点总结",
+        "paragraphs": [
+          "MVCC 的核心价值，是让普通读不用等待正在写的数据，通过版本链和 Read View 找到当前事务应该看到的历史版本。",
+          "MVCC 像给数据拍了多张历史照片。写事务可以继续改最新照片，读事务按照自己的 Read View 找到应该看的那一张，因此普通查询不用跟写操作硬排队。"
+        ],
+        "bullets": [
+          "undo log 保存历史版本",
+          "Read View 决定哪些事务版本可见",
+          "快照读通常不加锁",
+          "当前读仍然要配合锁机制"
+        ]
+      },
+      {
+        "id": "interview-highlights",
+        "h2": "面试常问",
+        "paragraphs": [],
+        "bullets": [
+          "RC 和 RR 的 Read View 有什么区别？",
+          "为什么长事务会影响 undo 清理？",
+          "面试官问到「MVCC 是如何实现读写并发的」时，30 秒内应该先给出什么结论？",
+          "如果继续追问原理，应该补充哪些关键机制和边界条件？",
+          "在真实项目里，什么场景会用到这个知识点，怎么说明取舍？",
+          "这个问题最容易答错的误区是什么，应该如何纠正？"
+        ],
+        "callout": "面试模式下建议先给 30 秒结论，再按原理、边界、项目场景逐层展开。"
+      },
+      {
+        "id": "reference-answer",
+        "h2": "参考答案和解析",
+        "paragraphs": [
+          "MVCC 通过版本链和 Read View 实现快照读，让普通读不用阻塞写。undo log 保存历史版本，Read View 判断当前事务能看哪一版，但当前读和写冲突仍然要靠锁。",
+          "每行记录会有事务 id，更新时旧版本进入 undo log 形成版本链。事务做快照读时生成 Read View，里面有活跃事务信息。读取时从最新版本开始判断，如果当前版本对这个 Read View 不可见，就沿 undo 版本链往回找，直到找到可见版本。这样普通查询可以看到一致快照，而不用等正在写的事务释放锁。",
+          "可以补 RC 和 RR 下 Read View 生成时机不同：读已提交通常每条语句生成新的 Read View，可重复读通常事务内复用第一次快照读的 Read View。这解释了为什么同一事务内多次读取结果是否稳定。",
+          "30 秒回答：先说明「MVCC 是如何实现读写并发的？」解决什么问题，再给出最核心的机制或结论。",
+          "1 分钟回答：继续按“定义和目标 -> 原理机制 -> 典型场景 -> 边界误区”的顺序展开，让答案既完整又容易复述。",
+          "深入追问：如果面试官继续问项目经验，要补充真实场景、方案取舍、风险控制和线上排查思路。"
+        ],
+        "bullets": [
+          "版本链",
+          "undo log",
+          "Read View",
+          "快照读和当前读区别"
+        ]
+      }
+    ],
+    "examPoint": "先讲读写冲突，再讲版本链和 Read View 如何让读不阻塞写。",
+    "summary": "MVCC 的核心价值，是让普通读不用等待正在写的数据，通过版本链和 Read View 找到当前事务应该看到的历史版本。",
+    "scenario": "订单系统里，一个事务正在修改订单状态，另一个事务同时查询订单列表。如果每次读都等写锁释放，列表查询会被拖慢；MVCC 就是为了让普通读尽量不被写阻塞。",
+    "article": {
+      "conclusion": "MVCC 的核心价值，是让普通读不用等待正在写的数据，通过版本链和 Read View 找到当前事务应该看到的历史版本。",
+      "keyTakeaways": [
+        "undo log 保存历史版本",
+        "Read View 决定哪些事务版本可见",
+        "快照读通常不加锁",
+        "当前读仍然要配合锁机制"
+      ],
+      "learningGoals": [
+        "版本链里保存了什么？",
+        "Read View 如何判断版本可见？",
+        "为什么 MVCC 不能替代锁？"
+      ],
+      "plainSummary": "MVCC 像给数据拍了多张历史照片。写事务可以继续改最新照片，读事务按照自己的 Read View 找到应该看的那一张，因此普通查询不用跟写操作硬排队。",
+      "plainRetell": "我会说 MVCC 通过 undo log 维护历史版本，通过 Read View 判断版本可见，让普通 select 可以读到一致快照而不阻塞写；但 update、delete、select for update 这种当前读还要靠锁处理冲突。",
+      "strongSummary": "MVCC 要讲成“版本链 + Read View + 可见性判断”，最后一定补一句它和锁的边界。",
+      "sections": [
+        {
+          "id": "scenario",
+          "h2": "一、先从真实场景开始",
+          "paragraphs": [
+            "订单系统里，一个事务正在修改订单状态，另一个事务同时查询订单列表。如果每次读都等写锁释放，列表查询会被拖慢；MVCC 就是为了让普通读尽量不被写阻塞。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "先建立问题动机，再进入原理推导。"
+        },
+        {
+          "id": "why",
+          "h2": "二、核心原理为什么成立",
+          "paragraphs": [
+            "每次更新都会形成新版本，旧版本通过 undo log 串起来。",
+            "事务执行快照读时会生成 Read View，里面记录活跃事务范围。",
+            "读取时沿版本链回溯，找到对当前 Read View 可见的版本。",
+            "写写冲突、当前读、范围修改仍然需要锁，因此 MVCC 不是锁的替代品。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "每个结论都要解释为什么，不能停在概念层面。"
+        },
+        {
+          "id": "diagram",
+          "h2": "三、结构图解",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "diagram",
+          "highlight": "图解只承担辅助理解，不用为了有图而强行 Mermaid。",
+          "diagramCode": "记录 row\n├─ trx_id=90  value=A\n├─ undo -> trx_id=80 value=旧A\n└─ undo -> trx_id=70 value=更旧A\nRead View 决定当前事务能看到哪一版",
+          "diagramType": "ascii-tree",
+          "fallbackDescription": "记录 row\n├─ trx_id=90  value=A\n├─ undo -> trx_id=80 value=旧A\n└─ undo -> trx_id=70 value=更旧A\nRead View 决定当前事务能看到哪一版"
+        },
+        {
+          "id": "comparison",
+          "h2": "四、对比分析",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "comparison",
+          "highlight": "对比题必须让用户知道为什么不用另一个方案。",
+          "comparison": {
+            "title": "MVCC 和锁的职责边界",
+            "headers": [
+              "机制",
+              "主要解决",
+              "典型场景",
+              "不能解决"
+            ],
+            "rows": [
+              [
+                "MVCC",
+                "读写并发",
+                "普通 select 快照读",
+                "写写冲突"
+              ],
+              [
+                "行锁",
+                "写冲突控制",
+                "update/delete/select for update",
+                "历史版本可见性"
+              ],
+              [
+                "next-key lock",
+                "范围写冲突",
+                "防止范围内插入影响当前读",
+                "普通快照读展示"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "code",
+          "h2": "五、代码或命令示例",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "code",
+          "highlight": "代码示例要能解释观察点，而不是只展示语法。",
+          "codeExample": {
+            "title": "快照读和当前读的差异",
+            "language": "sql",
+            "code": "START TRANSACTION;\nSELECT * FROM orders WHERE id = 1;\nSELECT * FROM orders WHERE id = 1 FOR UPDATE;\nCOMMIT;",
+            "explanation": "普通 SELECT 通常是快照读，按照 Read View 找可见版本；FOR UPDATE 是当前读，会读取最新已提交版本并尝试加锁。"
+          }
+        },
+        {
+          "id": "mistake",
+          "h2": "六、常见误区",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "mistake",
+          "highlight": "误区要指出为什么错，以及正确边界是什么。",
+          "mistake": {
+            "mistake": "MVCC 能解决所有事务并发问题，所以有 MVCC 就不需要锁。",
+            "whyWrong": "MVCC 主要优化普通读写并发，写写冲突和当前读仍需要锁来保证正确性。",
+            "correct": "MVCC 和锁是配合关系：快照读看版本，当前读和写操作看锁。"
+          }
+        }
+      ]
+    },
+    "selfTests": [
+      {
+        "level": "基础",
+        "question": "版本链里保存了什么？",
+        "hint": "先说问题本质，再说关键机制。",
+        "answer": "MVCC 通过版本链和 Read View 实现快照读，让普通读不用阻塞写。undo log 保存历史版本，Read View 判断当前事务能看哪一版，但当前读和写冲突仍然要靠锁。",
+        "gradingCriteria": [
+          {
+            "criterion": "核心结论准确",
+            "points": 40,
+            "description": "能说出问题本质和关键机制。"
+          },
+          {
+            "criterion": "能解释为什么",
+            "points": 40,
+            "description": "不是只背名词，而是能解释设计原因。"
+          },
+          {
+            "criterion": "表达清晰",
+            "points": 20,
+            "description": "回答有结论和层次。"
+          }
+        ]
+      },
+      {
+        "level": "应用",
+        "question": "如果放到真实项目里，你会怎么判断该方案是否合适？",
+        "hint": "从场景、风险、监控和兜底四个角度想。",
+        "answer": "我会说 MVCC 通过 undo log 维护历史版本，通过 Read View 判断版本可见，让普通 select 可以读到一致快照而不阻塞写；但 update、delete、select for update 这种当前读还要靠锁处理冲突。",
+        "gradingCriteria": [
+          {
+            "criterion": "场景匹配",
+            "points": 35,
+            "description": "能说明适用条件。"
+          },
+          {
+            "criterion": "风险意识",
+            "points": 35,
+            "description": "能指出边界和误区。"
+          },
+          {
+            "criterion": "工程表达",
+            "points": 30,
+            "description": "能落到项目验证或排查。"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "MySQL 8.4 Reference Manual",
+        "url": "https://dev.mysql.com/doc/refman/8.4/en/",
+        "type": "官方文档",
+        "trustLevel": "S"
+      }
+    ],
+    "interviewContent": {
+      "question": "MVCC 是如何实现读写并发的？",
+      "questionVariants": [
+        "你能讲一下MVCC 是如何实现读写并发的吗？",
+        "如果面试官继续追问这个问题，你会从哪些维度展开？"
+      ],
+      "answer30s": "MVCC 通过版本链和 Read View 实现快照读，让普通读不用阻塞写。undo log 保存历史版本，Read View 判断当前事务能看哪一版，但当前读和写冲突仍然要靠锁。",
+      "answer2min": "每行记录会有事务 id，更新时旧版本进入 undo log 形成版本链。事务做快照读时生成 Read View，里面有活跃事务信息。读取时从最新版本开始判断，如果当前版本对这个 Read View 不可见，就沿 undo 版本链往回找，直到找到可见版本。这样普通查询可以看到一致快照，而不用等正在写的事务释放锁。",
+      "advancedAnswer": "可以补 RC 和 RR 下 Read View 生成时机不同：读已提交通常每条语句生成新的 Read View，可重复读通常事务内复用第一次快照读的 Read View。这解释了为什么同一事务内多次读取结果是否稳定。",
+      "essentialPoints": [
+        {
+          "point": "版本链"
+        },
+        {
+          "point": "undo log"
+        },
+        {
+          "point": "Read View"
+        },
+        {
+          "point": "快照读和当前读区别"
+        }
+      ],
+      "bonusPoints": [
+        {
+          "point": "RC 每条语句生成，RR 事务级复用。",
+          "why": "RC 和 RR 的 Read View 有什么区别？"
+        },
+        {
+          "point": "老 Read View 还可能需要历史版本，purge 不能过早清理。",
+          "why": "为什么长事务会影响 undo 清理？"
+        }
+      ],
+      "advancedPoints": [],
+      "deductPoints": [
+        {
+          "point": "MVCC 能解决所有事务并发问题，所以有 MVCC 就不需要锁。",
+          "why": "MVCC 主要优化普通读写并发，写写冲突和当前读仍需要锁来保证正确性。"
+        }
+      ],
+      "followUps": [
+        {
+          "question": "RC 和 RR 的 Read View 有什么区别？",
+          "difficulty": "hard",
+          "keyAnswer": "RC 每条语句生成，RR 事务级复用。"
+        },
+        {
+          "question": "为什么长事务会影响 undo 清理？",
+          "difficulty": "hard",
+          "keyAnswer": "老 Read View 还可能需要历史版本，purge 不能过早清理。"
+        }
+      ]
+    }
+  }
+}

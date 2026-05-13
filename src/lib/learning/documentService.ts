@@ -7,6 +7,7 @@ import {
   type LearningContent,
   type QualityReportPayload,
 } from "@/lib/learning/content-contract";
+import { getKnowledgeRelationBundle, type KnowledgeRelationBundle } from "@/lib/learning/knowledgeCardStudio";
 import { buildDocumentQuestionPath, getTopicBankDetail, type TopicBankTreeGroup } from "@/lib/learning/topicBankService";
 
 export type LearningQuestionDetail = {
@@ -14,6 +15,12 @@ export type LearningQuestionDetail = {
   title: string;
   difficulty: "easy" | "medium" | "hard";
   tags: string[];
+  contentMeta?: {
+    contentType: "interview_question" | "knowledge_card";
+    layout: "question" | "knowledge";
+    needsWideBody: boolean;
+    diagramRequired: boolean;
+  };
   answer: {
     keyPoints: string[];
     detailedExplanation: string;
@@ -57,11 +64,12 @@ export type LearningQuestionDetail = {
         type: "text" | "diagram" | "code" | "mistake" | "comparison" | "quiz";
         paragraphs?: string[];
         bullets?: string[];
+      callout?: string;
         highlight?: string;
         diagramType?: "mermaid" | "text";
         diagramCode?: string;
         fallbackDescription?: string;
-        diagramSpec?: LearningContent["article"]["sections"][number]["diagramSpec"];
+      diagramSpec?: NonNullable<LearningContent["article"]>["sections"][number]["diagramSpec"];
         codeExample?: {
           title?: string;
           language: string;
@@ -75,6 +83,11 @@ export type LearningQuestionDetail = {
           headers: string[];
           rows: string[][];
         };
+      mistake?: {
+        mistake: string;
+        whyWrong?: string;
+        correct?: string;
+      };
       }>;
     };
     selfTests?: LearningContent["selfTests"];
@@ -86,7 +99,9 @@ export type LearningQuestionDetail = {
     id: string;
     title: string;
     difficulty: "easy" | "medium" | "hard";
+    path: string;
   }>;
+  knowledgeRelations: KnowledgeRelationBundle;
   interviewFrequency: "high" | "medium" | "low";
   sourceUrl: string | null;
   category: {
@@ -197,6 +212,7 @@ function buildRichArticle(
       type: section.type,
       paragraphs: section.body ? [section.body] : undefined,
       bullets: section.type === "quiz" && section.quiz ? [section.quiz.question, section.quiz.hint ?? ""].filter(Boolean) : undefined,
+      callout: section.type === "mistake" ? undefined : section.highlight,
       highlight: section.highlight,
       diagramType: section.type === "diagram" ? "mermaid" : undefined,
       diagramCode: section.diagramCode,
@@ -215,6 +231,13 @@ function buildRichArticle(
             title: section.comparison.title,
             headers: section.comparison.headers,
             rows: section.comparison.rows,
+          }
+        : undefined,
+      mistake: section.mistake
+        ? {
+            mistake: section.mistake.mistake,
+            whyWrong: section.mistake.whyWrong,
+            correct: section.mistake.correct,
           }
         : undefined,
     })),
@@ -318,31 +341,41 @@ export async function getPublishedDocumentDetail(options: {
   const learningContent = normalizeLearningContent(version?.learningContent);
   const interviewContent = normalizeInterviewContent(version?.interviewContent);
   const qualityReport = normalizeQualityReport(version?.qualityReport ?? null);
-  const detail = await getTopicBankDetail(options.bankId);
-
-  const relatedDocuments = document.chapterId
-    ? await prisma.document.findMany({
-        where: {
-          topicBankId: options.bankId,
-          chapterId: document.chapterId,
-          status: "PUBLISHED",
-          id: { not: document.id },
-        },
-        orderBy: [{ publishedAt: "asc" }, { createdAt: "asc" }],
-        take: 6,
-        select: {
-          id: true,
-          title: true,
-          difficulty: true,
-        },
-      })
-    : [];
+  const [detail, relatedDocuments, knowledgeRelations] = await Promise.all([
+    getTopicBankDetail(options.bankId),
+    document.chapterId
+      ? prisma.document.findMany({
+          where: {
+            topicBankId: options.bankId,
+            chapterId: document.chapterId,
+            status: "PUBLISHED",
+            id: { not: document.id },
+          },
+          orderBy: [{ publishedAt: "asc" }, { createdAt: "asc" }],
+          take: 6,
+          select: {
+            id: true,
+            title: true,
+            difficulty: true,
+          },
+        })
+      : Promise.resolve([]),
+    getKnowledgeRelationBundle({
+      documentId: document.id,
+    }),
+  ]);
 
   return {
     id: document.id,
     title: document.title,
     difficulty: toDifficulty(document.difficulty),
     tags: document.tags.map((item) => item.tag.name),
+    contentMeta: {
+      contentType: learningContent.contentType ?? "interview_question",
+      layout: learningContent.readingExperience?.layout ?? "knowledge",
+      needsWideBody: learningContent.readingExperience?.needsWideBody ?? true,
+      diagramRequired: learningContent.diagramGuidance?.required ?? false,
+    },
     answer: {
       keyPoints: learningContent.article?.keyTakeaways ?? [],
       detailedExplanation:
@@ -364,7 +397,9 @@ export async function getPublishedDocumentDetail(options: {
       id: item.id,
       title: item.title,
       difficulty: toDifficulty(item.difficulty),
+      path: buildDocumentQuestionPath(options.bankId, document.chapterId ?? "uncategorized", item.id),
     })),
+    knowledgeRelations,
     interviewFrequency: toFrequency(document.frequency),
     sourceUrl: learningContent.sources?.[0]?.url ?? null,
     category: {

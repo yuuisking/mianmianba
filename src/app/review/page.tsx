@@ -1,671 +1,1299 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import type { JSX } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useAuthDialog } from "@/components/auth/AuthDialogProvider";
-import { getInterviewModeLabel, type InterviewMode } from "@/lib/interview/config";
+import type {
+  ReviewDashboardFilters,
+  ReviewEvidenceDTO,
+  ReviewIssueDTO,
+  V2ReviewDashboardSnapshot,
+} from "@/lib/interview-v2/domain";
 
-interface Session {
-  id: string;
-  createdAt: string;
-  status: string;
-  score: number | null;
-  mode: string;
-  _count: {
-    messages: number;
-  };
-  report: {
-    dimensions: string | null;
-    risks: string | null;
-  } | null;
-}
-
-type Weakness = {
-  name: string;
-  desc: string;
-  count: number;
-  isRisk: boolean;
+type ReviewDashboardResponse = {
+  data?: V2ReviewDashboardSnapshot;
+  error?: string;
 };
 
-export default function Review() {
+type ReviewIssueResponse = {
+  data?: ReviewIssueDTO;
+  error?: string;
+};
+
+type ReviewEvidenceResponse = {
+  data?: ReviewEvidenceDTO[];
+  error?: string;
+};
+
+type ReviewActionExecuteResponse = {
+  data?: {
+    executionId: string;
+    targetPath: string | null;
+    startUrl: string | null;
+    payload: Record<string, unknown>;
+  };
+  error?: string;
+};
+
+const REVIEW_FILTERS_STORAGE_KEY = "review-dashboard-filters-v2";
+
+/**
+ * 生成匿名态复盘快照。
+ * @returns {V2ReviewDashboardSnapshot} 匿名快照。
+ */
+function buildAnonymousReviewSnapshot(): V2ReviewDashboardSnapshot {
+  return {
+    snapshotId: null,
+    filters: {
+      timeRange: "14d",
+      interviewType: "all",
+      role: null,
+      company: null,
+      dimension: null,
+      sampleStatus: "all",
+    },
+    filterOptions: {
+      roles: [],
+      companies: [],
+      dimensions: [],
+    },
+    headline: "登录后，系统会基于你的真实样本给出问题、证据、动作和改善验证。",
+    trendSummary: "复盘中心不会凭空创造结论，至少需要真实训练样本才能形成稳定分析。",
+    headlineCard: {
+      title: "当前还没有稳定结论",
+      summary: "请先登录并完成真实训练，系统才会把问题、证据和动作链路跑起来。",
+      priority: "medium",
+      issueId: null,
+      trendDirection: "stable",
+      sampleCount: 0,
+    },
+    todayActionCard: {
+      title: "先补真实样本",
+      description: "至少完成一场模拟、专项训练或学习测验后，复盘中心才会形成可追溯结论。",
+      actionType: "collect_sample",
+      targetPath: "/setup",
+      actionPayload: {},
+      expectedOutcome: "获得第一批可用于诊断的问题和证据。",
+    },
+    confidenceCard: {
+      confidenceLevel: "low",
+      confidenceScore: 0,
+      sampleCoverage: 0,
+      timeCoverage: 0,
+      dimensionCoverage: 0,
+    },
+    sampleSummaryCard: {
+      validSampleCount: 0,
+      invalidSampleCount: 0,
+      timeRangeLabel: "最近 14 天",
+      mainSourceBreakdown: [],
+    },
+    metrics: [],
+    issues: [],
+    evidences: [],
+    actions: [],
+    progressOverview: {
+      improvedIssueCount: 0,
+      worsenedIssueCount: 0,
+      stableIssueCount: 0,
+      verifiedActionCount: 0,
+      effectiveActionCount: 0,
+    },
+    issueProgress: [],
+    actionEffectiveness: [],
+    historySessions: [],
+    invalidSessions: [],
+    comparisonGroups: [],
+    agentTrace: [],
+  };
+}
+
+/**
+ * 读取本地保存的筛选条件。
+ * @returns {ReviewDashboardFilters | null} 最近一次筛选。
+ */
+function readStoredFilters(): ReviewDashboardFilters | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(REVIEW_FILTERS_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    return JSON.parse(raw) as ReviewDashboardFilters;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 保存最近一次筛选条件。
+ * @param {ReviewDashboardFilters} filters 当前筛选。
+ * @returns {void}
+ */
+function persistFilters(filters: ReviewDashboardFilters): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(REVIEW_FILTERS_STORAGE_KEY, JSON.stringify(filters));
+}
+
+/**
+ * 从 URL 查询参数中恢复复盘筛选条件。
+ * @param searchParams 当前 URL 查询参数。
+ * @returns 局部筛选条件。
+ */
+function readFiltersFromSearchParams(
+  searchParams: URLSearchParams
+): Partial<ReviewDashboardFilters> {
+  return {
+    role: searchParams.get("role")?.trim() || null,
+    company: searchParams.get("company")?.trim() || null,
+    dimension: searchParams.get("dimension")?.trim() || null,
+  };
+}
+
+/**
+ * 从 URL 中恢复 issue / evidence 深链参数。
+ * @param searchParams 当前 URL 查询参数。
+ * @returns 深链参数。
+ */
+function readReviewDeepLinkParams(searchParams: URLSearchParams): {
+  issueId: string | null;
+  evidenceId: string | null;
+} {
+  return {
+    issueId: searchParams.get("issueId")?.trim() || null,
+    evidenceId: searchParams.get("evidenceId")?.trim() || null,
+  };
+}
+
+/**
+ * 格式化时间。
+ * @param {string | null} value ISO 时间字符串。
+ * @returns {string} 格式化结果。
+ */
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "--";
+  }
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes()
+  ).padStart(2, "0")}`;
+}
+
+/**
+ * 获取动作优先级文案。
+ * @param {"today" | "thisWeek" | "keep"} priority 优先级。
+ * @returns {string} 文案。
+ */
+function getActionPriorityLabel(priority: "today" | "thisWeek" | "keep"): string {
+  if (priority === "today") {
+    return "今日最该做";
+  }
+  if (priority === "thisWeek") {
+    return "本周应完成";
+  }
+  return "持续保持项";
+}
+
+/**
+ * 获取问题严重度文案。
+ * @param {"high" | "medium" | "low"} severity 严重度。
+ * @returns {string} 展示文案。
+ */
+function getIssueSeverityLabel(severity: "high" | "medium" | "low"): string {
+  if (severity === "high") {
+    return "高频";
+  }
+  if (severity === "medium") {
+    return "重点";
+  }
+  return "观察中";
+}
+
+/**
+ * 获取训练类型展示文案。
+ * @param {string} mode 样本模式。
+ * @returns {string} 展示文案。
+ */
+function getReviewModeLabel(mode: string): string {
+  const normalized = mode.toLowerCase();
+  if (normalized.includes("learning")) {
+    return "学习测验";
+  }
+  if (normalized.includes("targeted")) {
+    return "专项训练";
+  }
+  return "模拟面试";
+}
+
+/**
+ * 获取训练类型图标色调。
+ * @param {string} mode 样本模式。
+ * @returns {"orange" | "blue"} 色调。
+ */
+function getReviewModeTone(mode: string): "orange" | "blue" {
+  return mode.toLowerCase().includes("targeted") || mode.toLowerCase().includes("learning")
+    ? "blue"
+    : "orange";
+}
+
+/**
+ * 根据下标轮换展示色调。
+ * @param {number} index 当前下标。
+ * @returns {"orange" | "blue" | "green" | "purple"} 色调。
+ */
+function getReviewAccentTone(index: number): "orange" | "blue" | "green" | "purple" {
+  const tones: Array<"orange" | "blue" | "green" | "purple"> = [
+    "orange",
+    "blue",
+    "green",
+    "purple",
+  ];
+  return tones[index % tones.length];
+}
+
+/**
+ * 将数值限制在百分比范围内。
+ * @param {number} value 原始值。
+ * @returns {number} 0 到 100 之间的百分比数值。
+ */
+function clampPercentage(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+/**
+ * 格式化带正负号的分值变化。
+ * @param {number} value 原始变化值。
+ * @returns {string} 展示文本。
+ */
+function formatSignedValue(value: number): string {
+  const rounded = Math.round(value);
+  return `${rounded > 0 ? "+" : ""}${rounded}`;
+}
+
+/**
+ * 获取动作效果展示文案。
+ * @param {"effective" | "partial" | "ineffective" | "unknown"} effectiveness 效果结果。
+ * @returns {string} 展示文案。
+ */
+function getActionEffectivenessLabel(
+  effectiveness: "effective" | "partial" | "ineffective" | "unknown"
+): string {
+  if (effectiveness === "effective") {
+    return "有效";
+  }
+  if (effectiveness === "partial") {
+    return "部分有效";
+  }
+  if (effectiveness === "ineffective") {
+    return "待调整";
+  }
+  return "待观察";
+}
+
+/**
+ * 获取动作效果色调。
+ * @param {"effective" | "partial" | "ineffective" | "unknown"} effectiveness 效果结果。
+ * @returns {"green" | "blue" | "orange" | "purple"} 色调。
+ */
+function getActionEffectivenessTone(
+  effectiveness: "effective" | "partial" | "ineffective" | "unknown"
+): "green" | "blue" | "orange" | "purple" {
+  if (effectiveness === "effective") {
+    return "green";
+  }
+  if (effectiveness === "partial") {
+    return "blue";
+  }
+  if (effectiveness === "ineffective") {
+    return "orange";
+  }
+  return "purple";
+}
+
+export default function Review(): JSX.Element {
   const router = useRouter();
   const { data: session } = useSession();
   const { requestAuth } = useAuthDialog();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [allSessionsForWeaknesses, setAllSessionsForWeaknesses] = useState<Session[]>([]);
+  const [filters, setFilters] = useState<ReviewDashboardFilters>(
+    buildAnonymousReviewSnapshot().filters
+  );
+  const [dashboard, setDashboard] = useState<V2ReviewDashboardSnapshot>(
+    buildAnonymousReviewSnapshot()
+  );
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [selectedIssueDetail, setSelectedIssueDetail] = useState<ReviewIssueDTO | null>(null);
+  const [selectedIssueEvidences, setSelectedIssueEvidences] = useState<ReviewEvidenceDTO[]>([]);
+  const [deepLinkEvidenceId, setDeepLinkEvidenceId] = useState<string | null>(null);
+  const [showDiagnosisSection, setShowDiagnosisSection] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const limit = 3;
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [isIssueLoading, setIsIssueLoading] = useState(false);
+  const [executingActionId, setExecutingActionId] = useState<string | null>(null);
 
-  // Weaknesses pagination
-  const [weaknessPage, setWeaknessPage] = useState(1);
-  const WEAKNESS_LIMIT = 3;
-
-  // Brand Guidelines
-  const fontHeading = "'Poppins', Arial, sans-serif";
-  const fontBody = "'Lora', Georgia, serif";
-  const colorDark = "#141413";
-  const colorLight = "#faf9f5";
-  const colorMidGray = "#b0aea5";
-  const colorLightGray = "#e8e6dc";
-  const colorOrange = "#d97757";
-  const colorBlue = "#6a9bcc";
-  const colorGreen = "#788c5d";
-
-  const fetchSessions = async (searchQuery = "", currentPage = 1) => {
+  /**
+   * 拉取完整复盘快照。
+   * @param {ReviewDashboardFilters} nextFilters 当前筛选条件。
+   * @returns {Promise<void>} 拉取完成。
+   */
+  async function fetchDashboard(nextFilters: ReviewDashboardFilters): Promise<void> {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/sessions/recent?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(searchQuery)}`);
-      if (res.ok) {
-        const json = await res.json();
-        setSessions(json.data || []);
-        if (json.meta) {
-          setTotal(json.meta.total);
-        }
+      const searchParams = new URLSearchParams({
+        timeRange: nextFilters.timeRange,
+        interviewType: nextFilters.interviewType,
+        sampleStatus: nextFilters.sampleStatus,
+      });
+      if (nextFilters.role) {
+        searchParams.set("role", nextFilters.role);
       }
+      if (nextFilters.company) {
+        searchParams.set("company", nextFilters.company);
+      }
+      if (nextFilters.dimension) {
+        searchParams.set("dimension", nextFilters.dimension);
+      }
+
+      const response = await fetch(`/api/v2/review/dashboard?${searchParams.toString()}`);
+      if (!response.ok) {
+        throw new Error(`review dashboard failed: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as ReviewDashboardResponse;
+      if (!payload.data) {
+        throw new Error(payload.error || "review dashboard missing data");
+      }
+
+      const data = payload.data;
+      setDashboard(data);
+      const nextIssueId = data.issues[0]?.id ?? null;
+      setSelectedIssueId((current) =>
+        current && data.issues.some((issue) => issue.id === current) ? current : nextIssueId
+      );
     } catch (error) {
-      console.error("Failed to fetch sessions", error);
+      console.error("Failed to fetch review dashboard", error);
+      setDashboard(buildAnonymousReviewSnapshot());
+      setSelectedIssueId(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const fetchAllSessionsForWeaknesses = async () => {
+  /**
+   * 拉取当前选中问题的详情与证据。
+   * @param {string} issueId 问题 ID。
+   * @returns {Promise<void>} 拉取完成。
+   */
+  async function fetchIssueDetails(issueId: string): Promise<void> {
+    setIsIssueLoading(true);
     try {
-      // Fetch a larger amount of sessions to generate weaknesses properly regardless of current page
-      const res = await fetch(`/api/sessions/recent?page=1&limit=50`);
-      if (res.ok) {
-        const json = await res.json();
-        setAllSessionsForWeaknesses(json.data || []);
+      const [detailResponse, evidenceResponse] = await Promise.all([
+        fetch(`/api/v2/review/issues/${issueId}`),
+        fetch(`/api/v2/review/issues/${issueId}/evidences`),
+      ]);
+
+      const detailPayload = (await detailResponse.json()) as ReviewIssueResponse;
+      const evidencePayload = (await evidenceResponse.json()) as ReviewEvidenceResponse;
+      setSelectedIssueDetail(detailPayload.data ?? null);
+      setSelectedIssueEvidences(evidencePayload.data ?? []);
+    } catch (error) {
+      console.error("Failed to fetch review issue detail", error);
+      setSelectedIssueDetail(null);
+      setSelectedIssueEvidences([]);
+    } finally {
+      setIsIssueLoading(false);
+    }
+  }
+
+  /**
+   * 执行动作卡并进入对应训练页。
+   * @param {string} actionId 动作 ID。
+   * @returns {Promise<void>} 执行完成。
+   */
+  async function handleExecuteAction(actionId: string): Promise<void> {
+    if (!session?.user?.id) {
+      requestAuth();
+      return;
+    }
+
+    setExecutingActionId(actionId);
+    try {
+      const response = await fetch(`/api/v2/review/actions/${actionId}/execute`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error(`execute action failed: ${response.status}`);
+      }
+
+      const payload = (await response.json()) as ReviewActionExecuteResponse;
+      if (payload.data?.startUrl) {
+        router.push(payload.data.startUrl);
       }
     } catch (error) {
-      console.error("Failed to fetch all sessions for weaknesses", error);
+      console.error("Failed to execute review action", error);
+    } finally {
+      setExecutingActionId(null);
     }
-  };
+  }
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+    const stored = readStoredFilters();
+    const searchParams =
+      typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const urlFilters =
+      searchParams ? readFiltersFromSearchParams(searchParams) : {};
+    const deepLinkParams = searchParams
+      ? readReviewDeepLinkParams(searchParams)
+      : { issueId: null, evidenceId: null };
+    const hasUrlFilters = Boolean(urlFilters.role || urlFilters.company || urlFilters.dimension);
+    setDeepLinkEvidenceId(deepLinkParams.evidenceId);
+    if (deepLinkParams.issueId) {
+      setSelectedIssueId(deepLinkParams.issueId);
+      setShowDiagnosisSection(true);
+    }
+    if (stored || hasUrlFilters) {
+      setFilters({
+        ...(stored || buildAnonymousReviewSnapshot().filters),
+        ...urlFilters,
+      });
+    }
+  }, []);
 
   useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch]);
+    persistFilters(filters);
+  }, [filters]);
 
   useEffect(() => {
     if (!session?.user?.id) {
-      setSessions([]);
-      setAllSessionsForWeaknesses([]);
+      setDashboard(buildAnonymousReviewSnapshot());
+      setSelectedIssueId(null);
+      setSelectedIssueDetail(null);
+      setSelectedIssueEvidences([]);
       setIsLoading(false);
       return;
     }
-    fetchSessions(debouncedSearch, page);
-  }, [debouncedSearch, page, session?.user?.id]);
+
+    void fetchDashboard(filters);
+  }, [filters, session?.user?.id]);
 
   useEffect(() => {
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !selectedIssueId) {
+      setSelectedIssueDetail(null);
+      setSelectedIssueEvidences([]);
       return;
     }
-    fetchAllSessionsForWeaknesses();
-  }, [session?.user?.id]);
+    void fetchIssueDetails(selectedIssueId);
+  }, [selectedIssueId, session?.user?.id]);
 
-  const executeDelete = async (id: string) => {
-    try {
-      const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setSessionToDelete(null);
-        fetchSessions(debouncedSearch, page);
-        fetchAllSessionsForWeaknesses();
-      }
-    } catch (error) {
-      console.error("Failed to delete", error);
+  const selectedIssue = useMemo(
+    () => dashboard.issues.find((item) => item.id === selectedIssueId) ?? null,
+    [dashboard.issues, selectedIssueId]
+  );
+  const topIssues = useMemo(() => dashboard.issues.slice(0, 3), [dashboard.issues]);
+  const topActions = useMemo(() => dashboard.actions.slice(0, 3), [dashboard.actions]);
+  const topHistorySessions = useMemo(
+    () => dashboard.historySessions.slice(0, 8),
+    [dashboard.historySessions]
+  );
+  const topIssueProgress = useMemo(
+    () => dashboard.issueProgress.slice(0, 5),
+    [dashboard.issueProgress]
+  );
+  const topActionEffectiveness = useMemo(
+    () => dashboard.actionEffectiveness.slice(0, 5),
+    [dashboard.actionEffectiveness]
+  );
+  const primaryComparisonGroup = dashboard.comparisonGroups[0] ?? null;
+  const primaryMetric = dashboard.metrics[0] ?? null;
+  const secondaryMetric = dashboard.metrics[1] ?? null;
+  const actionVerificationRate =
+    dashboard.progressOverview.verifiedActionCount > 0
+      ? Math.round(
+          (dashboard.progressOverview.effectiveActionCount /
+            dashboard.progressOverview.verifiedActionCount) *
+            100
+        )
+      : 0;
+
+  useEffect(() => {
+    if (selectedIssueId) {
+      return;
     }
-  };
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  };
+    const searchParams =
+      typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const issueId = searchParams?.get("issueId")?.trim() || "";
+    if (issueId && dashboard.issues.some((item) => item.id === issueId)) {
+      setSelectedIssueId(issueId);
+    }
+  }, [dashboard.issues, selectedIssueId]);
 
-  const getModeLabel = (mode: string) => {
-    const normalizedMode: InterviewMode =
-      mode === "realtime" ? "realtime" : mode === "targeted" ? "targeted" : "text";
-    return getInterviewModeLabel(normalizedMode);
-  };
+  useEffect(() => {
+    if (!deepLinkEvidenceId || selectedIssueEvidences.length === 0) {
+      return;
+    }
 
-  const weaknesses = useMemo(() => {
-    const map = new Map<string, Weakness>();
-    allSessionsForWeaknesses.forEach(session => {
-      if (session.report) {
-        try {
-          const dims = JSON.parse(session.report.dimensions || "[]");
-          dims.forEach((dim: { name: string; score: string | number }) => {
-            const scoreNum = typeof dim.score === 'string' ? parseFloat(dim.score) : dim.score;
-            if (!isNaN(scoreNum) && scoreNum < 7) {
-              const key = `dim-${dim.name}`;
-              if (map.has(key)) {
-                map.get(key)!.count += 1;
-              } else {
-                map.set(key, {
-                  name: dim.name,
-                  desc: `该维度近期评分较低 (最近一次: ${dim.score})，系统建议进行针对性训练。`,
-                  count: 1,
-                  isRisk: false
-                });
-              }
-            }
-          });
+    const hasMatchedEvidence = selectedIssueEvidences.some((item) => item.id === deepLinkEvidenceId);
+    if (!hasMatchedEvidence) {
+      return;
+    }
 
-          const risks = JSON.parse(session.report.risks || "[]");
-          risks.forEach((risk: string) => {
-            const shortName = risk.length > 15 ? risk.substring(0, 15) + "..." : risk;
-            const key = `risk-${shortName}`;
-            if (map.has(key)) {
-              map.get(key)!.count += 1;
-            } else {
-              map.set(key, {
-                name: `高频风险: ${shortName}`,
-                desc: risk,
-                count: 1,
-                isRisk: true
-              });
-            }
-          });
-        } catch (e) {
-          console.error("Failed to parse report in weakness extraction", e);
-        }
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`review-evidence-${deepLinkEvidenceId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [deepLinkEvidenceId, selectedIssueEvidences]);
+
+  useEffect(() => {
+    if (!showDiagnosisSection) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setShowDiagnosisSection(false);
       }
-    });
+    };
 
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [allSessionsForWeaknesses]);
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
 
-  const totalPages = Math.ceil(total / limit);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showDiagnosisSection]);
 
-  const totalWeaknessPages = Math.ceil(weaknesses.length / WEAKNESS_LIMIT);
-  const paginatedWeaknesses = weaknesses.slice((weaknessPage - 1) * WEAKNESS_LIMIT, weaknessPage * WEAKNESS_LIMIT);
-
-  if (!session?.user?.id) {
-    return (
-      <section
-        id="view-review"
-        className="view active"
-        style={{
-          backgroundColor: colorLight,
-          color: colorDark,
-          minHeight: "70vh",
-          padding: "2rem 0",
-          fontFamily: fontBody
-        }}
-      >
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1rem", display: "grid", gap: "1.25rem" }}>
-          <div style={{ padding: "2.25rem", borderRadius: "28px", background: "white", border: `1px solid ${colorLightGray}`, boxShadow: "0 14px 30px rgba(20,20,19,0.05)" }}>
-            <h1 style={{ marginBottom: "0.8rem" }}>复盘中心</h1>
-            <p style={{ color: colorMidGray, maxWidth: "48ch", marginBottom: "1.5rem" }}>
-              这里会集中展示面试后的评分变化、常见薄弱项和后续训练建议，帮助你持续复盘和迭代。
-            </p>
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1.5rem" }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() =>
-                  requestAuth({
-                    title: "登录后查看完整复盘",
-                    description: "登录成功后将回到复盘中心，并加载你的历史记录与完整报告。",
-                    callbackUrl: "/review"
-                  })
-                }
-              >
-                登录体验完整功能
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => router.push("/practice")}>
-                去做专项训练
-              </button>
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: "1rem 1.15rem",
-              borderRadius: "18px",
-              border: `1px solid ${colorLightGray}`,
-              background: "rgba(255,255,255,0.74)",
-              color: colorDark
-            }}
-          >
-            登录后可查看你自己的历史记录、薄弱维度和完整报告。
-          </div>
-        </div>
-      </section>
-    );
+  /**
+   * 展开诊断区并滚动到对应位置。
+   * @returns {void}
+   */
+  function revealDiagnosisSection(issueId?: string | null): void {
+    if (issueId) {
+      setSelectedIssueId(issueId);
+    } else if (!selectedIssueId && dashboard.issues[0]?.id) {
+      setSelectedIssueId(dashboard.issues[0].id);
+    }
+    setShowDiagnosisSection(true);
   }
 
+  /**
+   * 关闭诊断弹窗。
+   * @returns {void}
+   */
+  function closeDiagnosisSection(): void {
+    setShowDiagnosisSection(false);
+  }
+
+  const sourceBreakdown = useMemo(
+    () => dashboard.sampleSummaryCard.mainSourceBreakdown.slice(0, 4),
+    [dashboard.sampleSummaryCard.mainSourceBreakdown]
+  );
+  const totalSourceCount = useMemo(
+    () => sourceBreakdown.reduce((sum, item) => sum + item.count, 0),
+    [sourceBreakdown]
+  );
+  const coverageItems = useMemo(
+    () => [
+      {
+        label: "样本覆盖",
+        value: clampPercentage(dashboard.confidenceCard.sampleCoverage),
+      },
+      {
+        label: "时间覆盖",
+        value: clampPercentage(dashboard.confidenceCard.timeCoverage),
+      },
+      {
+        label: "维度覆盖",
+        value: clampPercentage(dashboard.confidenceCard.dimensionCoverage),
+      },
+    ],
+    [
+      dashboard.confidenceCard.dimensionCoverage,
+      dashboard.confidenceCard.sampleCoverage,
+      dashboard.confidenceCard.timeCoverage,
+    ]
+  );
+  const activeDiagnosisTitle = selectedIssue?.name || dashboard.headlineCard.title;
+
   return (
-    <section id="view-review" className="view active" style={{ 
-      backgroundColor: colorLight, 
-      color: colorDark,
-      minHeight: "100vh",
-      padding: "2rem 0",
-      fontFamily: fontBody
-    }}>
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1rem" }}>
-        <h2 style={{ 
-          fontFamily: fontHeading, 
-          fontSize: "1.5rem", 
-          borderBottom: `2px solid ${colorLightGray}`, 
-          paddingBottom: "1rem", 
-          marginBottom: "1.5rem" 
-        }}>
-          错题本 (高频薄弱维度)
-        </h2>
-        
-        <div style={{ marginBottom: "4rem" }}>
-          {weaknesses.length === 0 ? (
-            <div style={{
-              padding: "3rem",
-              textAlign: "center",
-              backgroundColor: "white",
-              borderRadius: "12px",
-              border: `1px dashed ${colorMidGray}`,
-              color: colorMidGray
-            }}>
-              <div style={{ fontSize: "2rem", marginBottom: "1rem" }}>✨</div>
-              <div style={{ fontSize: "1.2rem", fontFamily: fontHeading }}>太棒了！近期面试没有发现明显短板</div>
-              <p style={{ marginTop: "0.5rem" }}>继续保持良好的面试状态吧</p>
+    <main className="v2-review-shell">
+      <section className="v2-review-kpi-grid">
+        <article className="v2-review-kpi-card">
+          <div className="v2-review-kpi-main">
+            <div className="v2-review-kpi-icon orange">样</div>
+            <div>
+              <div className="v2-review-kpi-title">有效训练样本</div>
+              <div className="v2-review-kpi-value">
+                {dashboard.sampleSummaryCard.validSampleCount}
+                <small> 个</small>
+              </div>
+              <div className="v2-review-kpi-sub">
+                {dashboard.sampleSummaryCard.timeRangeLabel} · 无效样本{" "}
+                {dashboard.sampleSummaryCard.invalidSampleCount} 个
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article className="v2-review-kpi-card">
+          <div className="v2-review-kpi-main">
+            <div className="v2-review-kpi-icon blue">分</div>
+            <div>
+              <div className="v2-review-kpi-title">{primaryMetric?.label || "平均表现"}</div>
+              <div className="v2-review-kpi-value">
+                {primaryMetric?.value || "--"}
+                {primaryMetric?.value?.includes("分") ? null : <small />}
+              </div>
+              <div className="v2-review-kpi-sub">
+                {primaryMetric?.helper || dashboard.trendSummary}
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article className="v2-review-kpi-card">
+          <div className="v2-review-kpi-main">
+            <div className="v2-review-kpi-icon green">弱</div>
+            <div>
+              <div className="v2-review-kpi-title">当前关键问题</div>
+              <div className="v2-review-kpi-value v2-review-kpi-value--text">
+                {topIssues[0]?.name || dashboard.headlineCard.title}
+              </div>
+              <div className="v2-review-kpi-sub">
+                {topIssues[0]?.summary || dashboard.headlineCard.summary}
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article className="v2-review-kpi-card">
+          <div className="v2-review-kpi-main">
+            <div className="v2-review-kpi-icon purple">验</div>
+            <div>
+              <div className="v2-review-kpi-title">动作验证率</div>
+              <div className="v2-review-kpi-value">
+                {actionVerificationRate}
+                <small>%</small>
+              </div>
+              <div className="v2-review-kpi-sub">
+                已验证 {dashboard.progressOverview.verifiedActionCount} 条 · 有效{" "}
+                {dashboard.progressOverview.effectiveActionCount} 条
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section className="v2-review-top-panels">
+        <section className="v2-review-summary-panel">
+          <div className="v2-review-summary-panel__head">
+            <h2>高频薄弱维度</h2>
+            <span>基于最近 {dashboard.sampleSummaryCard.validSampleCount} 次有效训练</span>
+          </div>
+          <div className="v2-review-summary-list">
+            {topIssues.length > 0 ? (
+              topIssues.map((issue, index) => {
+                const tone = getReviewAccentTone(index);
+                return (
+                  <article
+                    key={issue.id}
+                    className={`v2-review-summary-card ${tone} ${
+                      selectedIssueId === issue.id ? "is-active" : ""
+                    }`}
+                  >
+                    <div className="v2-review-summary-card__num">{String(index + 1).padStart(2, "0")}</div>
+                    <div className="v2-review-summary-card__body">
+                      <div className="v2-review-summary-card__title">
+                        <strong>{issue.name}</strong>
+                        <span className={`v2-review-inline-tag ${tone}`}>
+                          {getIssueSeverityLabel(issue.severity)}
+                        </span>
+                      </div>
+                      <p>{issue.summary}</p>
+                      <div className="v2-review-summary-card__meta">
+                        <span>出现次数 {issue.frequency} 次</span>
+                        <span>影响分 {Math.round(issue.impactScore)}</span>
+                        <span>最近一次 {formatDateTime(issue.latestSeenAt)}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`v2-review-summary-btn ${tone}`}
+                      onClick={() => revealDiagnosisSection(issue.id)}
+                    >
+                      查看诊断
+                    </button>
+                  </article>
+                );
+              })
+            ) : (
+              <article className="card v2-review-empty-card">
+                <strong>{isLoading ? "正在分析薄弱维度..." : "当前没有稳定薄弱维度"}</strong>
+                <p>系统只展示已经有真实样本支撑的问题，不会凭空生成高频项。</p>
+              </article>
+            )}
+          </div>
+        </section>
+
+        <section className="v2-review-summary-panel">
+          <div className="v2-review-summary-panel__head">
+            <h2>推荐补强计划</h2>
+            <span>根据真实问题自动生成</span>
+          </div>
+          <div className="v2-review-summary-list">
+            {topActions.length > 0 ? (
+              topActions.map((action, index) => {
+                const tone = getReviewAccentTone(index);
+                return (
+                  <article key={action.id} className={`v2-review-summary-card ${tone}`}>
+                    <div className="v2-review-summary-card__num">{String(index + 1).padStart(2, "0")}</div>
+                    <div className="v2-review-summary-card__body">
+                      <div className="v2-review-summary-card__title">
+                        <strong>{action.title}</strong>
+                        <span className={`v2-review-inline-tag ${tone}`}>
+                          {getActionPriorityLabel(action.priority)}
+                        </span>
+                      </div>
+                      <p>{action.description}</p>
+                      <div className="v2-review-summary-card__meta">
+                        <span>推荐方式 {action.recommendedMode}</span>
+                        <span>预计投入 {action.estimatedEffort}</span>
+                        <span>
+                          {action.recommendedQuestionTypes.length > 0
+                            ? action.recommendedQuestionTypes.join(" / ")
+                            : "按当前问题自动生成"}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`v2-review-summary-btn ${tone}`}
+                      disabled={executingActionId === action.id}
+                      onClick={() => void handleExecuteAction(action.id)}
+                    >
+                      {executingActionId === action.id ? "正在进入..." : "开始计划"}
+                    </button>
+                  </article>
+                );
+              })
+            ) : (
+              <article className="card v2-review-empty-card">
+                <strong>当前还没有可执行补强计划</strong>
+                <p>请先补足有效样本，系统才会把建议收敛成可执行任务卡。</p>
+              </article>
+            )}
+          </div>
+        </section>
+      </section>
+
+      <section className="v2-review-analytics-grid">
+        <section className="v2-review-analytics-card">
+          <div className="v2-review-analytics-card__head">
+            <div>
+              <h2>问题趋势分析</h2>
+              <p>按真实快照对比上一次与当前得分变化。</p>
+            </div>
+          </div>
+          <div className="v2-review-analytics-stats">
+            <article className="v2-review-analytics-stat">
+              <strong>{dashboard.progressOverview.improvedIssueCount}</strong>
+              <span>改善问题</span>
+            </article>
+            <article className="v2-review-analytics-stat">
+              <strong>{dashboard.progressOverview.worsenedIssueCount}</strong>
+              <span>恶化问题</span>
+            </article>
+            <article className="v2-review-analytics-stat">
+              <strong>{dashboard.progressOverview.stableIssueCount}</strong>
+              <span>稳定问题</span>
+            </article>
+          </div>
+          {topIssueProgress.length > 0 ? (
+            <div className="v2-review-table-wrap">
+              <table className="v2-review-data-table">
+                <thead>
+                  <tr>
+                    <th>问题</th>
+                    <th>上次</th>
+                    <th>当前</th>
+                    <th>变化</th>
+                    <th>判断</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topIssueProgress.map((item) => (
+                    <tr key={item.issueId || item.issueName}>
+                      <td>
+                        <div className="v2-review-table-label">
+                          <strong>{item.issueName}</strong>
+                          <span className="v2-review-table-meter">
+                            <span style={{ width: `${clampPercentage(item.currentScore)}%` }} />
+                          </span>
+                        </div>
+                      </td>
+                      <td>{Math.round(item.previousScore)}</td>
+                      <td>{Math.round(item.currentScore)}</td>
+                      <td
+                        className={
+                          item.changeDirection === "down"
+                            ? "is-positive"
+                            : item.changeDirection === "up"
+                              ? "is-negative"
+                              : ""
+                        }
+                      >
+                        {formatSignedValue(item.changeValue)}
+                      </td>
+                      <td>{item.judgement}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {paginatedWeaknesses.map((weakness, index) => {
-                const actualIndex = (weaknessPage - 1) * WEAKNESS_LIMIT + index;
-                const accentColor = actualIndex % 3 === 0 ? colorOrange : (actualIndex % 3 === 1 ? colorBlue : colorGreen);
-                return (
-                  <div key={index} style={{ 
-                    display: "flex", 
-                    justifyContent: "space-between", 
-                    alignItems: "center",
-                    padding: "1.5rem",
-                    backgroundColor: "white",
-                    borderRadius: "12px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
-                    border: `1px solid ${colorLightGray}`,
-                    borderLeft: `4px solid ${accentColor}`
-                  }}>
-                    <div style={{ flex: 1, paddingRight: "2rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.5rem" }}>
-                        <h3 style={{ margin: 0, fontFamily: fontHeading, fontSize: "1.2rem", color: colorDark }}>
-                          #{actualIndex + 1} {weakness.name}
-                        </h3>
-                        {weakness.count > 1 && (
-                          <span style={{ 
-                            fontSize: "0.75rem", 
-                            padding: "0.2rem 0.6rem", 
-                            backgroundColor: colorLightGray, 
-                            color: colorDark,
-                            borderRadius: "12px",
-                            fontFamily: fontHeading
-                          }}>
-                            出现 {weakness.count} 次
-                          </span>
-                        )}
-                        {weakness.isRisk && (
-                          <span style={{ 
-                            fontSize: "0.75rem", 
-                            padding: "0.2rem 0.6rem", 
-                            backgroundColor: "rgba(217, 119, 87, 0.1)", 
-                            color: colorOrange,
-                            borderRadius: "12px",
-                            fontFamily: fontHeading
-                          }}>
-                            高危风险
-                          </span>
-                        )}
-                      </div>
-                      <p style={{ margin: 0, color: colorMidGray, lineHeight: 1.6 }}>
-                        {weakness.desc}
-                      </p>
-                    </div>
-                    <button 
-                      onClick={() => router.push(`/interview?mode=targeted&topic=${encodeURIComponent(weakness.name)}&desc=${encodeURIComponent(weakness.desc)}`)}
-                      style={{
-                        padding: "0.6rem 1.5rem",
-                        backgroundColor: accentColor,
-                        color: "white",
-                        border: "none",
-                        borderRadius: "24px",
-                        fontFamily: fontHeading,
-                        fontSize: "0.95rem",
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        transition: "all 0.2s"
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.filter = "brightness(0.9)";
-                        e.currentTarget.style.transform = "translateY(-1px)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.filter = "none";
-                        e.currentTarget.style.transform = "none";
-                      }}
-                    >
-                      专项突破
-                    </button>
+            <div className="v2-review-empty-table">当前还没有足够历史快照，暂时无法生成趋势表。</div>
+          )}
+        </section>
+
+        <section className="v2-review-analytics-card">
+          <div className="v2-review-analytics-card__head">
+            <div>
+              <h2>动作效果分析</h2>
+              <p>看哪些补强动作真的有效，避免只看建议不看结果。</p>
+            </div>
+          </div>
+          <div className="v2-review-analytics-stats">
+            <article className="v2-review-analytics-stat">
+              <strong>{dashboard.progressOverview.verifiedActionCount}</strong>
+              <span>已验证动作</span>
+            </article>
+            <article className="v2-review-analytics-stat">
+              <strong>{dashboard.progressOverview.effectiveActionCount}</strong>
+              <span>验证有效</span>
+            </article>
+            <article className="v2-review-analytics-stat">
+              <strong>{actionVerificationRate}%</strong>
+              <span>验证率</span>
+            </article>
+          </div>
+          {topActionEffectiveness.length > 0 ? (
+            <div className="v2-review-table-wrap">
+              <table className="v2-review-data-table">
+                <thead>
+                  <tr>
+                    <th>动作</th>
+                    <th>执行次数</th>
+                    <th>采样数</th>
+                    <th>效果</th>
+                    <th>说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topActionEffectiveness.map((item) => (
+                    <tr key={item.actionId || item.actionTitle}>
+                      <td>{item.actionTitle}</td>
+                      <td>{item.executionCount}</td>
+                      <td>{item.postActionSampleCount}</td>
+                      <td>
+                        <span
+                          className={`v2-review-inline-tag ${getActionEffectivenessTone(
+                            item.effectiveness
+                          )}`}
+                        >
+                          {getActionEffectivenessLabel(item.effectiveness)}
+                        </span>
+                      </td>
+                      <td>{item.summary}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="v2-review-empty-table">当前还没有动作执行记录，暂时无法生成效果表。</div>
+          )}
+        </section>
+
+        <section className="v2-review-analytics-card">
+            <div className="v2-review-analytics-card__head">
+              <div>
+                <h2>样本覆盖与来源</h2>
+                <p>把可信度、来源分布和当前对比视角放到同一张分析卡里。</p>
+              </div>
+            </div>
+            <div className="v2-review-coverage-grid">
+              {coverageItems.map((item) => (
+                <article key={item.label} className="v2-review-coverage-card">
+                  <div className="v2-review-coverage-card__top">
+                    <strong>{item.value}%</strong>
+                    <span>{item.label}</span>
                   </div>
-                );
-              })}
-              
-              {totalWeaknessPages > 1 && (
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem", marginTop: "1.5rem" }}>
-                  <button
-                    onClick={() => setWeaknessPage(p => Math.max(1, p - 1))}
-                    disabled={weaknessPage === 1}
-                    style={{
-                      padding: "0.4rem 0.8rem",
-                      borderRadius: "16px",
-                      border: `1px solid ${weaknessPage === 1 ? colorLightGray : colorMidGray}`,
-                      backgroundColor: "white",
-                      color: weaknessPage === 1 ? colorMidGray : colorDark,
-                      cursor: weaknessPage === 1 ? "not-allowed" : "pointer",
-                      fontFamily: fontHeading,
-                      fontSize: "0.85rem",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    上一页
-                  </button>
-                  <span style={{ fontFamily: fontHeading, color: colorMidGray, fontSize: "0.85rem" }}>
-                    {weaknessPage} / {totalWeaknessPages}
+                  <span className="v2-review-table-meter">
+                    <span style={{ width: `${item.value}%` }} />
                   </span>
-                  <button
-                    onClick={() => setWeaknessPage(p => Math.min(totalWeaknessPages, p + 1))}
-                    disabled={weaknessPage === totalWeaknessPages}
-                    style={{
-                      padding: "0.4rem 0.8rem",
-                      borderRadius: "16px",
-                      border: `1px solid ${weaknessPage === totalWeaknessPages ? colorLightGray : colorMidGray}`,
-                      backgroundColor: "white",
-                      color: weaknessPage === totalWeaknessPages ? colorMidGray : colorDark,
-                      cursor: weaknessPage === totalWeaknessPages ? "not-allowed" : "pointer",
-                      fontFamily: fontHeading,
-                      fontSize: "0.85rem",
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    下一页
-                  </button>
+                </article>
+              ))}
+            </div>
+            <div className="v2-review-source-list">
+              {sourceBreakdown.length > 0 ? (
+                sourceBreakdown.map((item) => {
+                  const width =
+                    totalSourceCount > 0
+                      ? Math.max(12, Math.round((item.count / totalSourceCount) * 100))
+                      : 0;
+                  return (
+                    <article key={item.source} className="v2-review-source-item">
+                      <div className="v2-review-source-item__head">
+                        <strong>{item.source}</strong>
+                        <span>{item.count} 个样本</span>
+                      </div>
+                      <span className="v2-review-table-meter">
+                        <span style={{ width: `${width}%` }} />
+                      </span>
+                    </article>
+                  );
+                })
+              ) : (
+                <div className="v2-review-empty-table">
+                  当前还没有稳定来源分布，继续累积真实样本后会自动更新。
                 </div>
               )}
             </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", paddingBottom: "1rem", borderBottom: `2px solid ${colorLightGray}` }}>
-          <h2 style={{ 
-            fontFamily: fontHeading, 
-            fontSize: "1.5rem",
-            margin: 0
-          }}>
-            历史面试记录 {total > 0 && `(${total})`}
-          </h2>
-          <div>
-            <input 
-              type="text" 
-              placeholder="检索面试类型..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                padding: "0.6rem 1.2rem",
-                border: `1px solid ${colorLightGray}`,
-                borderRadius: "24px",
-                fontSize: "0.9rem",
-                outline: "none",
-                fontFamily: fontBody,
-                width: "240px",
-                backgroundColor: "white",
-                transition: "border-color 0.2s"
-              }}
-              onFocus={(e) => e.currentTarget.style.borderColor = colorBlue}
-              onBlur={(e) => e.currentTarget.style.borderColor = colorLightGray}
-            />
-          </div>
-        </div>
-        
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "2rem" }}>
-          {isLoading && sessions.length === 0 ? (
-            <div style={{ padding: "4rem", textAlign: "center", color: colorMidGray }}>
-              加载中...
-            </div>
-          ) : sessions.length === 0 ? (
-            <div style={{ padding: "4rem", textAlign: "center", color: colorMidGray, backgroundColor: "white", borderRadius: "12px", border: `1px dashed ${colorLightGray}` }}>
-              {search ? "没有找到符合条件的记录" : "暂无历史面试记录"}
-            </div>
-          ) : (
-            sessions.map((session) => {
-              const rounds = Math.floor((session._count?.messages || 0) / 2);
-              return (
-                <div 
-                  key={session.id}
-                  style={{
-                    display: "flex", 
-                    justifyContent: "space-between", 
-                    alignItems: "center", 
-                    padding: "1.5rem", 
-                    backgroundColor: "white",
-                    border: `1px solid ${colorLightGray}`,
-                    borderRadius: "12px",
-                    transition: "all 0.2s"
-                  }}
-                  onMouseEnter={(e) => { 
-                    e.currentTarget.style.borderColor = colorMidGray; 
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.02)"; 
-                  }}
-                  onMouseLeave={(e) => { 
-                    e.currentTarget.style.borderColor = colorLightGray; 
-                    e.currentTarget.style.boxShadow = "none"; 
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: "1.1rem", color: colorDark, fontFamily: fontHeading, marginBottom: "0.25rem" }}>
-                      {getModeLabel(session.mode)}
-                    </div>
-                    <div style={{ fontSize: "0.9rem", color: colorMidGray }}>
-                      {formatDate(session.createdAt)} • {rounds} 轮对话 {session.status !== "completed" ? "(提前结束)" : ""}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "2.5rem" }}>
-                    <div style={{ textAlign: "right", minWidth: "80px" }}>
-                      <div style={{ fontWeight: 600, fontSize: "1.25rem", color: session.score !== null ? (session.score >= 80 ? colorGreen : colorOrange) : colorMidGray }}>
-                        {session.score !== null ? (
-                          <>{session.score}<span style={{ fontSize: "0.8rem", color: colorMidGray }}>/100</span></>
-                        ) : (
-                          "--"
-                        )}
-                      </div>
-                      <div style={{ fontSize: "0.85rem", color: colorMidGray }}>{session.score !== null ? "综合评分" : "无评分"}</div>
-                    </div>
-                    
-                    <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-                      {session.report ? (
-                        <button 
-                          onClick={() => router.push(`/report?sessionId=${session.id}`)}
-                          style={{
-                            padding: "0.5rem 1.25rem",
-                            backgroundColor: "transparent",
-                            color: colorBlue,
-                            border: `1px solid ${colorBlue}`,
-                            borderRadius: "20px",
-                            fontSize: "0.9rem",
-                            fontWeight: 500,
-                            fontFamily: fontHeading,
-                            cursor: "pointer",
-                            transition: "all 0.2s"
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(106, 155, 204, 0.1)"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                        >
-                          查看报告
-                        </button>
-                      ) : (
-                        <button style={{
-                          padding: "0.5rem 1.25rem",
-                          backgroundColor: colorLightGray,
-                          color: colorMidGray,
-                          border: "none",
-                          borderRadius: "20px",
-                          fontSize: "0.9rem",
-                          fontWeight: 500,
-                          fontFamily: fontHeading,
-                          cursor: "not-allowed"
-                        }} disabled>
-                          报告未生成
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => setSessionToDelete(session.id)}
-                        style={{
-                          padding: "0.5rem 1.25rem",
-                          backgroundColor: "transparent",
-                          color: colorMidGray,
-                          border: "1px solid transparent",
-                          borderRadius: "20px",
-                          fontSize: "0.9rem",
-                          fontWeight: 500,
-                          fontFamily: fontHeading,
-                          cursor: "pointer",
-                          transition: "all 0.2s"
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = "#ef4444";
-                          e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.05)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = colorMidGray;
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
-                      >
-                        删除
-                      </button>
-                    </div>
+            {primaryComparisonGroup ? (
+              <>
+                <div className="v2-review-analytics-subtable">
+                  <div className="v2-review-analytics-subtable__title">
+                    <strong>{primaryComparisonGroup.groupType}</strong>
+                    <span>对比视角来自当前复盘快照中的真实分组。</span>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
+                <div className="v2-review-table-wrap">
+                  <table className="v2-review-data-table">
+                    <thead>
+                      <tr>
+                        <th>标签</th>
+                        <th>值</th>
+                        <th>说明</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {primaryComparisonGroup.items.map((item) => (
+                        <tr key={`${primaryComparisonGroup.groupKey}-${item.label}`}>
+                          <td>{item.label}</td>
+                          <td>{item.value}</td>
+                          <td>{item.helper}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : null}
+          </section>
+      </section>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem", marginTop: "2rem" }}>
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              style={{
-                padding: "0.5rem 1rem",
-                borderRadius: "20px",
-                border: `1px solid ${page === 1 ? colorLightGray : colorMidGray}`,
-                backgroundColor: "white",
-                color: page === 1 ? colorMidGray : colorDark,
-                cursor: page === 1 ? "not-allowed" : "pointer",
-                fontFamily: fontHeading
-              }}
-            >
-              上一页
-            </button>
-            <span style={{ fontFamily: fontHeading, color: colorMidGray }}>
-              {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              style={{
-                padding: "0.5rem 1rem",
-                borderRadius: "20px",
-                border: `1px solid ${page === totalPages ? colorLightGray : colorMidGray}`,
-                backgroundColor: "white",
-                color: page === totalPages ? colorMidGray : colorDark,
-                cursor: page === totalPages ? "not-allowed" : "pointer",
-                fontFamily: fontHeading
-              }}
-            >
-              下一页
-            </button>
+      <section className="v2-review-history-panel">
+        <div className="v2-review-history-panel__head">
+          <div>
+            <h2>历史训练记录</h2>
+            <p>点击右侧查看诊断，进入问题、证据、动作和验证的完整弹窗。</p>
           </div>
-        )}
-      </div>
+          <span>
+            {secondaryMetric?.label || "可信分"} ·{" "}
+            {secondaryMetric?.value || dashboard.confidenceCard.confidenceScore}
+          </span>
+        </div>
+        <div className="v2-review-history-scroll">
+          <table className="v2-review-history-table">
+            <thead>
+              <tr>
+                <th style={{ width: "18%" }}>训练时间</th>
+                <th style={{ width: "14%" }}>训练类型</th>
+                <th style={{ width: "26%" }}>方向</th>
+                <th style={{ width: "10%" }}>得分</th>
+                <th style={{ width: "16%" }}>证据状态</th>
+                <th style={{ width: "16%" }}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topHistorySessions.length > 0 ? (
+                topHistorySessions.map((item) => (
+                  <tr key={item.id}>
+                    <td>{formatDateTime(item.createdAt)}</td>
+                    <td>
+                      <span className="v2-review-type-pill">
+                        <span className={`v2-review-tiny-icon ${getReviewModeTone(item.mode)}`}>
+                          {getReviewModeTone(item.mode) === "blue" ? "◎" : "💬"}
+                        </span>
+                        {getReviewModeLabel(item.mode)}
+                      </span>
+                    </td>
+                    <td>{[item.role, item.company].filter(Boolean).join(" · ") || "未标明方向"}</td>
+                    <td>{item.score === null ? "--" : `${Math.round(item.score)} 分`}</td>
+                    <td>{item.hasEvidence ? "可下钻" : "待补证据"}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="v2-review-row-link"
+                        onClick={() => revealDiagnosisSection()}
+                      >
+                        查看诊断
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6}>
+                    <div className="v2-review-empty-table">
+                      {isLoading ? "正在整理历史记录..." : "当前还没有可展示的真实训练记录。"}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      {/* Delete Confirmation Modal */}
-      {sessionToDelete && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(20, 20, 19, 0.4)",
-          backdropFilter: "blur(2px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: "white",
-            padding: "2.5rem",
-            borderRadius: "12px",
-            width: "90%",
-            maxWidth: "440px",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.08)",
-            border: `1px solid ${colorLightGray}`,
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.5rem"
-          }}>
-            <div>
-              <h3 style={{ marginTop: 0, marginBottom: "0.5rem", fontFamily: fontHeading, color: colorDark, fontSize: "1.25rem" }}>
-                删除记录
-              </h3>
-              <p style={{ color: colorMidGray, margin: 0, fontSize: "0.95rem", lineHeight: 1.6 }}>
-                确定要永久删除这条面试记录吗？此操作无法撤销。
-              </p>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "0.5rem" }}>
-              <button 
-                onClick={() => setSessionToDelete(null)}
-                style={{
-                  padding: "0.6rem 1.5rem",
-                  backgroundColor: "transparent",
-                  border: `1px solid ${colorMidGray}`,
-                  borderRadius: "20px",
-                  color: colorDark,
-                  cursor: "pointer",
-                  fontFamily: fontHeading,
-                  fontSize: "0.9rem",
-                  fontWeight: 500
-                }}
+      {showDiagnosisSection ? (
+        <div
+          className="v2-review-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="问题诊断与改进行动"
+          onClick={closeDiagnosisSection}
+        >
+          <div
+            className="v2-review-modal__panel"
+            id="review-diagnosis-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="v2-review-modal__header">
+              <div className="v2-review-modal__hero">
+                <span className="pill blue">查看诊断</span>
+                <div>
+                  <h2>{activeDiagnosisTitle}</h2>
+                  <p>
+                    共 {dashboard.issues.length} 个问题，当前问题下有 {selectedIssueEvidences.length} 条证据，可执行动作{" "}
+                    {dashboard.actions.length} 条
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="v2-review-modal__close"
+                onClick={closeDiagnosisSection}
+                aria-label="关闭诊断弹窗"
               >
-                取消
-              </button>
-              <button 
-                onClick={() => executeDelete(sessionToDelete)}
-                style={{
-                  padding: "0.6rem 1.5rem",
-                  backgroundColor: "#ef4444",
-                  border: "1px solid #ef4444",
-                  borderRadius: "20px",
-                  color: "white",
-                  cursor: "pointer",
-                  fontFamily: fontHeading,
-                  fontSize: "0.9rem",
-                  fontWeight: 500
-                }}
-              >
-                确定删除
+                关闭诊断
               </button>
             </div>
+            <section className="v2-review-grid">
+        <section className="v2-review-grid__main">
+          <div className="v2-review-section" id="review-diagnosis-section">
+            <div className="v2-review-section__header">
+              <div>
+                <h2>问题</h2>
+                <p>先看问题本身，再看根因和影响。</p>
+              </div>
+            </div>
+
+            <div className="v2-review-diagnosis-layout">
+              <div className="v2-review-issue-list">
+                {dashboard.issues.length > 0 ? (
+                  dashboard.issues.map((issue) => (
+                    <button
+                      key={issue.id}
+                      type="button"
+                      className={`card v2-review-issue-card ${selectedIssueId === issue.id ? "is-active" : ""}`}
+                      onClick={() => setSelectedIssueId(issue.id)}
+                    >
+                      <div className="v2-review-issue-card__top">
+                        <strong>{issue.name}</strong>
+                        <span className={`pill ${issue.severity === "high" ? "orange" : issue.severity === "medium" ? "blue" : "green"}`}>
+                          {issue.severity === "high"
+                            ? "高优先级"
+                            : issue.severity === "medium"
+                              ? "中优先级"
+                              : "观察中"}
+                        </span>
+                      </div>
+                      <p>{issue.summary}</p>
+                      <div className="v2-review-issue-card__meta">
+                        <span>最近出现 {issue.frequency} 次</span>
+                        <span>最近一次 {formatDateTime(issue.latestSeenAt)}</span>
+                        <span>影响分 {Math.round(issue.impactScore)}</span>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <article className="card v2-review-empty-card">
+                    <strong>{isLoading ? "正在分析问题..." : "当前没有稳定问题进入主视图"}</strong>
+                    <p>当前样本不足或问题还不稳定，系统不会伪造强结论。</p>
+                  </article>
+                )}
+              </div>
+
+              <div className="card v2-review-issue-detail">
+                {selectedIssue && selectedIssueDetail ? (
+                  <>
+                    <div className="v2-review-issue-detail__top">
+                      <div>
+                  <span className="pill blue">{selectedIssue.category}</span>
+                        <h3>{selectedIssue.name}</h3>
+                      </div>
+                      <div className="v2-review-issue-detail__score">
+                        <strong>{Math.round(selectedIssue.impactScore)}</strong>
+                        <small>影响分</small>
+                      </div>
+                    </div>
+                    <p>{selectedIssue.summary}</p>
+                    <div className="v2-review-detail-grid">
+                      <article className="v2-review-detail-block">
+                        <strong>根因解释</strong>
+                        <p>{selectedIssueDetail.rootCause}</p>
+                      </article>
+                      <article className="v2-review-detail-block">
+                        <strong>影响说明</strong>
+                        <p>{selectedIssueDetail.impact.willAffect.join("、") || "等待更多样本"}</p>
+                      </article>
+                    </div>
+                    <div className="v2-review-root-tree">
+                      <strong>问题树</strong>
+                      {selectedIssueDetail.rootCauseTree.map((node) => (
+                        <article key={node.id} className="v2-review-root-node">
+                          <span>{node.label}</span>
+                          <p>{node.description}</p>
+                          {node.children.length > 0 ? (
+                            <div className="v2-review-root-node__children">
+                              {node.children.map((child) => (
+                                <div key={child.id} className="v2-review-root-child">
+                                  <strong>{child.label}</strong>
+                                  <p>{child.description}</p>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <article className="v2-review-empty-card">
+                    <strong>{isIssueLoading ? "正在加载问题详情..." : "选择左侧问题查看详情"}</strong>
+                    <p>你可以继续下钻到证据、动作和改善验证，而不是只停留在问题列表。</p>
+                  </article>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="v2-review-section">
+            <div className="v2-review-section__header">
+              <div>
+                <h2>证据</h2>
+                <p>只保留能支撑当前问题判断的真实片段。</p>
+              </div>
+            </div>
+            <div className="v2-review-evidence-list">
+              {selectedIssueEvidences.length > 0 ? (
+                selectedIssueEvidences.map((evidence) => (
+                  <article
+                    key={evidence.id}
+                    id={`review-evidence-${evidence.id}`}
+                    className={`card v2-review-evidence-card ${deepLinkEvidenceId === evidence.id ? "is-active" : ""}`}
+                  >
+                    <div className="v2-review-evidence-card__top">
+                      <strong>{evidence.questionTitle}</strong>
+                      <span className={`pill ${evidence.severity === "high" ? "orange" : evidence.severity === "medium" ? "blue" : "green"}`}>
+                        置信度 {Math.round(evidence.confidence)}
+                      </span>
+                    </div>
+                    <p>{evidence.excerpt}</p>
+                    <div className="v2-review-evidence-card__meta">
+                      <span>{evidence.sessionType}</span>
+                      <span>{formatDateTime(evidence.sessionCreatedAt)}</span>
+                      <span>{evidence.dimension}</span>
+                    </div>
+                    <div className="v2-review-evidence-card__context">
+                      <strong>为什么命中</strong>
+                      <p>{evidence.reason}</p>
+                      <strong>推荐改写</strong>
+                      <p>{evidence.rewriteSuggestion.improvedAnswer}</p>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <article className="card v2-review-empty-card">
+                  <strong>{selectedIssueId ? "当前问题还没有更多可展示证据" : "先选择一个问题"}</strong>
+                  <p>没有证据支撑的问题，不会进入最终用户视图。</p>
+                </article>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <aside className="v2-review-grid__side">
+          <section className="v2-review-section">
+            <div className="v2-review-section__header">
+              <div>
+                <h2>动作</h2>
+                <p>把当前问题直接转成可执行动作。</p>
+              </div>
+            </div>
+            <div className="v2-review-action-list">
+              {dashboard.actions.map((action) => (
+                <article key={action.id} className="card v2-review-action-card">
+                  <div className="v2-review-action-card__top">
+                    <strong>{action.title}</strong>
+                    <span className="pill blue">{getActionPriorityLabel(action.priority)}</span>
+                  </div>
+                  <p>{action.description}</p>
+                  <div className="v2-review-action-card__meta">
+                    <span>推荐方式：{action.recommendedMode}</span>
+                    <span>推荐题型：{action.recommendedQuestionTypes.join(" / ")}</span>
+                    <span>投入：{action.estimatedEffort}</span>
+                  </div>
+                  <div className="v2-review-action-card__why">
+                    <strong>为什么练这个</strong>
+                    <p>{action.whyThisAction}</p>
+                    <strong>完成标准</strong>
+                    <p>{action.successMetric}</p>
+                    <strong>验证标准</strong>
+                    <p>{action.expectedOutcome}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={executingActionId === action.id}
+                    onClick={() => void handleExecuteAction(action.id)}
+                  >
+                    {executingActionId === action.id ? "正在进入..." : "去行动"}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        </aside>
+            </section>
           </div>
         </div>
-      )}
-    </section>
+      ) : null}
+    </main>
   );
 }

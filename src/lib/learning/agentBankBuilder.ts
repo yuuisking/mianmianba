@@ -8,6 +8,7 @@ import {
   type PublishDecision,
   type RiskLevel,
 } from "@/lib/learning/contentQuality";
+import { DEFAULT_BANK_TOPICS } from "@/lib/learning/defaultBankTopics";
 import { buildAutoDiscoveredSources, buildKnowledgeTopicProfile } from "@/lib/learning/sourceDiscovery";
 import {
   buildStarterBankMeta,
@@ -71,29 +72,6 @@ type BuiltBankResult = {
   }>;
   warnings: string[];
 };
-
-export const DEFAULT_BANK_TOPICS = [
-  "Java 基础",
-  "Java 集合",
-  "Java 并发",
-  "JVM",
-  "Spring",
-  "SpringBoot",
-  "SpringCloud",
-  "MySQL",
-  "Redis",
-  "Kafka",
-  "计算机网络",
-  "操作系统",
-  "消息队列",
-  "后端系统设计",
-  "设计模式",
-  "JavaScript",
-  "TypeScript",
-  "前端工程化",
-  "Vue 3",
-  "React",
-];
 
 /**
  * Converts a free-form text string into a stable slug identifier.

@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>答岸 AI · 响应式 UI 修复版</title>
+<style>
+:root{
+  --bg:#fbf8f3;--panel:#fff;--panel2:#fffaf6;--line:#eadfd4;--text:#20242a;--muted:#746f68;
+  --orange:#ef6b3d;--orange2:#fff1ea;--blue:#4d8fe3;--blue2:#eef6ff;--green:#5f9b62;
+  --green2:#eef8ef;--purple:#845bd3;--purple2:#f3edff;--shadow:0 12px 34px rgba(68,45,25,.07);
+  --r:8px;--gap:clamp(10px,1.35vw,18px);--page:clamp(14px,2vw,24px);
+}
+*{box-sizing:border-box}
+html{font-size:clamp(13px,1.05vw,15px)}
+body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;color:var(--text)}
+button,input,textarea,select{font:inherit}
+button{white-space:nowrap}
+h1,h2,h3,p{margin-top:0}
+h1{font-size:clamp(1.35rem,2.1vw,2.05rem);line-height:1.2;margin-bottom:.45rem}
+h2{font-size:clamp(1.05rem,1.55vw,1.45rem);line-height:1.25;margin-bottom:.65rem}
+h3{font-size:1rem;line-height:1.28;margin-bottom:.65rem}
+.sub{color:var(--muted);line-height:1.55}.small{font-size:.8rem;color:#938d86;line-height:1.45}
+.topbar{position:sticky;top:0;z-index:50;min-height:70px;border-bottom:1px solid var(--line);background:rgba(251,248,243,.9);backdrop-filter:blur(16px);display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr) minmax(150px,220px);align-items:center;gap:14px;padding:10px var(--page)}
+.brand{display:flex;align-items:center;gap:10px;font-size:1.2rem;font-weight:900;min-width:max-content}
+.brand-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#ff9a63,#ef5f33);color:#fff;display:grid;place-items:center}
+.nav{display:flex;gap:6px;overflow:auto;scrollbar-width:none;justify-content:center}
+.nav::-webkit-scrollbar{display:none}
+.nav button{border:0;background:transparent;padding:11px 14px;border-radius:999px;color:#68625b;font-weight:800;cursor:pointer}
+.nav button.active{background:#fff0ea;color:var(--orange)}
+.user{display:flex;gap:8px;align-items:center;justify-content:flex-end;min-width:max-content}
+.main{width:100%;max-width:1840px;margin:0 auto;padding:0 var(--page) 48px}
+.screen{display:none}.screen.active{display:block}
+.card{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--gap);margin-bottom:var(--gap)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.btn{border:0;border-radius:8px;padding:10px 16px;background:var(--orange);color:#fff;font-weight:900;cursor:pointer;box-shadow:0 8px 18px rgba(239,107,61,.2)}
+.btn.outline{background:#fff;color:#2f2b27;border:1px solid #ddd5cc;box-shadow:none}.btn.ghost{background:#fff7f2;color:var(--orange);border:1px solid #ffd1bf;box-shadow:none}
+.icon-btn{width:34px;height:34px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;display:grid;place-items:center;color:#706a63}
+.pill{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 10px;font-weight:800;color:#5f5a54;font-size:.88rem}
+.pill.orange{background:var(--orange2);color:var(--orange);border-color:#ffd4c3}.pill.blue{background:var(--blue2);color:var(--blue);border-color:#d6e7ff}.pill.green{background:var(--green2);color:var(--green);border-color:#d9ebd8}.pill.purple{background:var(--purple2);color:var(--purple);border-color:#e2d5ff}
+.bar{height:7px;border-radius:999px;background:#eee5db;overflow:hidden}.bar i{display:block;height:100%;background:var(--orange);border-radius:999px}
+
+.hero{position:relative;padding:clamp(22px,4vw,42px);display:grid;grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr);gap:var(--gap);align-items:center;overflow:hidden}
+.screen#home>.hero{border-top:0;border-top-left-radius:0;border-top-right-radius:0}
+.hero h1{font-size:clamp(2.05rem,3.35vw,3.25rem)}
+.hero h1{margin-bottom:.62rem}
+.hero-copy{margin-top:.55rem}
+.hero .sub{font-size:clamp(1rem,1.2vw,1.18rem);margin-bottom:1.05rem}
+.hero-pills .pill{font-size:.95rem;padding:7px 13px}
+.hero-pills{display:flex;gap:14px;margin-top:20px;flex-wrap:wrap}.hero-illus{height:clamp(220px,22vw,310px);border-radius:8px;background:transparent;position:relative;overflow:visible}
+.feature-carousel{height:100%;position:relative}
+.feature-slide{position:absolute;inset:0;padding:clamp(8px,1vw,14px);display:grid;place-items:center;opacity:0;transform:translateX(0) scale(.9);transition:opacity .72s ease,transform .72s ease,filter .72s ease;filter:saturate(.85);pointer-events:none}
+.feature-slide.is-active{opacity:1;transform:translateX(0) scale(1);filter:saturate(1);z-index:5}
+.feature-slide.is-prev{opacity:.42;transform:translateX(22%) scale(.72);filter:saturate(.72);z-index:2}
+.feature-slide.is-next{opacity:.42;transform:translateX(-22%) scale(.72);filter:saturate(.72);z-index:2}
+.feature-slide.is-hidden{opacity:0;transform:translateX(0) scale(.68);z-index:1}
+.feature-slide:not(.is-active) .showcase-ribbon,.feature-slide:not(.is-active) .showcase-badge,.feature-slide:not(.is-active) .showcase-phone,.feature-slide:not(.is-active) .showcase-cursor,.feature-slide:not(.is-active) .showcase-runner{opacity:0}
+.product-showcase{width:min(800px,116%);height:100%;position:relative;display:grid;place-items:center;padding-top:8px}
+.showcase-preview{position:absolute;top:82px;width:260px;height:136px;border-radius:8px;background:rgba(255,255,255,.62);border:1px solid #e8eef6;box-shadow:0 14px 30px rgba(77,143,227,.08);opacity:.55;overflow:hidden;z-index:1}
+.showcase-preview:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,.3),rgba(77,143,227,.08)),repeating-linear-gradient(0deg,rgba(77,143,227,.14) 0 2px,transparent 2px 24px)}
+.showcase-preview.left{left:-18px;transform:translateX(-6px) scale(.92)}.showcase-preview.right{right:-20px;transform:translateX(6px) scale(.92)}
+.showcase-ribbon{position:absolute;top:2px;left:50%;transform:translateX(-50%);min-width:320px;text-align:center;padding:10px 28px;border-radius:999px;background:linear-gradient(90deg,#ff8f5f,#69a8ff);color:#fff;font-size:1rem;font-weight:900;letter-spacing:.1em;box-shadow:0 12px 26px rgba(77,143,227,.18);z-index:8;transition:opacity .35s ease}
+.feature-slide:nth-child(2) .showcase-ribbon{background:linear-gradient(90deg,#4d8fe3,#6fd0cf)}.feature-slide:nth-child(3) .showcase-ribbon{background:linear-gradient(90deg,#5f9b62,#86c98b)}.feature-slide:nth-child(4) .showcase-ribbon{background:linear-gradient(90deg,#845bd3,#ff9a63)}
+.showcase-screen{width:min(560px,76%);height:190px;border-radius:10px;background:#fff;box-shadow:0 28px 58px rgba(32,36,42,.18);position:relative;z-index:4;border:1px solid #e9dfd5;overflow:hidden;margin-top:34px;padding:0;animation:screenLift 6s infinite}
+.showcase-screen:before{content:"";position:absolute;left:0;right:0;top:0;height:26px;background:linear-gradient(90deg,#fff8f3,#f5faff);border-bottom:1px solid #eee5db}
+.sys-shot{position:relative;z-index:2;height:100%;display:grid;grid-template-columns:108px 1fr;gap:0;font-size:.68rem;color:#615b55;padding-top:26px}
+.sys-side{display:flex;flex-direction:column;gap:8px;padding:14px 12px;background:linear-gradient(180deg,#263653,#14233a);height:100%}.sys-side span{height:9px;border-radius:999px;background:rgba(255,255,255,.32)}.sys-side span:first-child{background:#69a8ff}
+.sys-main{display:grid;gap:8px;align-content:start;padding:12px;background:linear-gradient(180deg,#fff,#fffaf7)}.sys-title{font-weight:900;color:#20242a;font-size:.82rem}.sys-row{min-height:24px;border:1px solid #eee5db;border-radius:6px;background:#fffaf7;padding:5px 8px}.sys-row.blue{background:#f5faff;border-color:#d8e6fb}.sys-row.green{background:#f5fbf5;border-color:#d9ebd8}.sys-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.sys-card{min-height:38px;border:1px solid #eee5db;border-radius:7px;background:#fff;padding:7px 8px}.sys-chart{height:38px;border-radius:7px;background:repeating-linear-gradient(0deg,#f0f5ff 0 2px,transparent 2px 11px),linear-gradient(90deg,rgba(77,143,227,.12),rgba(239,107,61,.1));position:relative}.sys-chart:after{content:"";position:absolute;left:10px;right:10px;top:17px;height:2px;background:#8db8f0;box-shadow:34px -7px 0 #8db8f0,78px 5px 0 #8db8f0,116px -4px 0 #8db8f0}
+.sys-progress{height:7px;border-radius:999px;background:#eee5db;overflow:hidden}.sys-progress i{display:block;height:100%;width:64%;border-radius:999px;background:var(--orange);animation:runnerFill 6s infinite}
+.showcase-ghost{display:none;position:absolute;top:72px;width:260px;height:138px;border-radius:6px;background:rgba(255,255,255,.58);border:1px solid #e8eef6;opacity:.48;overflow:hidden}
+.showcase-ghost:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(77,143,227,.13) 0 2px,transparent 2px 28px),linear-gradient(90deg,rgba(239,107,61,.08),rgba(77,143,227,.08))}
+.showcase-ghost.left{left:-12px}.showcase-ghost.right{right:-18px}
+.showcase-badge{position:absolute;left:13%;bottom:34px;width:92px;height:92px;border-radius:50%;background:rgba(255,255,255,.88);box-shadow:0 16px 34px rgba(77,143,227,.16);z-index:6;display:grid;place-items:center;color:#6d7684;font-weight:900}
+.showcase-badge span{font-size:1.35rem;color:#20242a}.showcase-badge small{display:block;color:#22b84b;font-size:.95rem;margin-top:4px}
+.showcase-phone{position:absolute;right:11%;top:62px;width:92px;height:168px;border-radius:18px;background:rgba(255,255,255,.9);border:1px solid #e8eef6;box-shadow:0 18px 38px rgba(32,36,42,.14);z-index:6;display:none}
+.feature-slide:nth-child(2) .showcase-phone,.feature-slide:nth-child(4) .showcase-phone{display:block}.showcase-phone:before{content:"";position:absolute;left:16px;right:16px;top:26px;height:6px;border-radius:999px;background:#d9e6f6;box-shadow:0 22px 0 #edf1f6,0 44px 0 #dfe8f3,0 66px 0 #edf1f6,0 88px 0 #dfe8f3}
+.showcase-shadow{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:70%;height:42px;border-radius:50%;background:radial-gradient(ellipse,rgba(77,143,227,.16),transparent 72%)}
+.showcase-cursor{position:absolute;left:17%;top:94px;width:12px;height:12px;border-radius:50%;background:#ef6b3d;box-shadow:0 0 0 8px rgba(239,107,61,.14);z-index:10;animation:cursorFlow 6s infinite}
+.showcase-runner{position:absolute;right:13%;bottom:58px;width:74px;height:8px;border-radius:999px;background:#e8eef6;z-index:7;overflow:hidden}.showcase-runner:before{content:"";display:block;height:100%;width:42%;border-radius:999px;background:#ef6b3d;animation:runnerFill 6s infinite}
+.carousel-dots{display:none}
+@keyframes chipSelect{0%,18%{transform:scale(1);box-shadow:0 10px 22px rgba(77,143,227,.08)}34%,68%{transform:scale(1.05);box-shadow:0 12px 24px rgba(239,107,61,.14)}86%,100%{transform:scale(1)}}
+@keyframes cursorFlow{0%,18%{opacity:0;transform:translate(0,0)}28%{opacity:1;transform:translate(0,0)}58%{opacity:1;transform:translate(118px,54px)}78%{opacity:0;transform:translate(174px,76px)}100%{opacity:0}}
+@keyframes runnerFill{0%,20%{width:12%}52%{width:46%}82%{width:88%}100%{width:42%}}
+@keyframes screenLift{0%,20%{transform:translateY(8px) scale(.98)}45%,82%{transform:translateY(0) scale(1)}100%{transform:translateY(4px) scale(.99)}}
+.module-grid,.quick-grid,.topic-grid,.review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:var(--gap);margin-top:var(--gap)}
+.module,.kpi,.topic,.quick,.weak,.plan{padding:clamp(14px,1.8vw,20px)}
+.module{position:relative;overflow:hidden;min-height:168px;display:flex;flex-direction:column}
+.module h3{display:flex;align-items:center;gap:8px}
+.mini-logo{width:22px;height:22px;border-radius:7px;display:inline-grid;place-items:center;border:1px solid #ffd4c3;background:#fff4ee;color:var(--orange);flex:0 0 auto}
+.mini-logo svg{width:13px;height:13px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.module:nth-child(2) .mini-logo{border-color:#d6e7ff;background:#f3f8ff;color:var(--blue)}
+.module:nth-child(3) .mini-logo{border-color:#d9ebd8;background:#f3fbf3;color:var(--green)}
+.module:nth-child(4) .mini-logo{border-color:#e2d5ff;background:#f7f2ff;color:var(--purple)}
+.module p,.topic p{color:#625c55;line-height:1.55}.module .btn{margin-top:auto;width:96px;height:42px;padding:0;display:inline-grid;place-items:center;background:#fff7f2;color:var(--orange);border:1px solid #ffd1bf;box-shadow:none}
+.home-grid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:var(--gap);margin-top:var(--gap)}
+.kpi-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.kpi b{font-size:clamp(1.35rem,2.4vw,2rem)}
+.progress-bars .row{display:grid;grid-template-columns:minmax(120px,170px) 1fr 50px;gap:10px;align-items:center;margin:12px 0}
+.resume-row{display:grid;grid-template-columns:52px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:14px}
+.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.metric{position:relative;border:1px solid #efe4d8;background:#fffdfb;border-radius:8px;padding:12px 14px;min-width:0}
+.metric:before{content:"";display:block;width:24px;height:3px;border-radius:999px;background:#efb18f;margin-bottom:10px}
+.metric:nth-child(2):before{background:#96b8e9}.metric:nth-child(3):before{background:#93bd92}.metric:nth-child(4):before{background:#b8a1e6}
+.metric .label{font-size:.8rem;color:#7f7870;margin-bottom:4px}
+.metric strong{position:relative;z-index:1;font-size:clamp(1.15rem,2vw,1.55rem);line-height:1.1}
+.metric-value{display:flex;align-items:baseline;gap:4px}
+.metric-badge{display:inline-flex;align-items:center;gap:4px;margin-top:10px;padding:3px 8px;border-radius:999px;font-size:.74rem;font-weight:900;border:1px solid #eee5db;background:#fff;color:#6f6861}
+.metric-badge.positive{background:#eef8ef;border-color:#d9ebd8;color:var(--green)}
+.metric-badge.negative{background:#fff1ea;border-color:#ffd4c3;color:var(--orange)}
+.metric-badge.neutral{background:#f7f4ef;border-color:#eee5db;color:#6f6861}
+.progress-note{margin:0 0 12px;color:#6d665f;line-height:1.55}
+.continue-inline{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:12px;align-items:center;margin-top:12px;padding:11px 12px;border:1px solid #f0dfd1;border-radius:8px;background:#fffaf7}
+.continue-inline h4{margin:0 0 5px;font-size:.88rem;color:#6a625b}.continue-inline .mini-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.continue-inline .mini-meta b{font-size:.98rem;line-height:1.35}.continue-inline .bar{height:6px}.continue-inline .btn{padding:8px 12px;box-shadow:none}
+.weak-list{display:flex;flex-direction:column;gap:10px}
+.weak-chip{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid #f0dfd1;background:#fffdfb;border-radius:8px;padding:12px 14px}
+.weak-chip .rank{display:none}
+.weak-chip b{font-size:.9rem;line-height:1.35}.weak-chip .hint{display:block;margin-top:3px;color:#8b847d;font-size:.78rem}.weak-chip .bar{margin-top:9px;height:5px}.weak-chip .score{font-size:.9rem;font-weight:900;color:#5f5a54}
+
+.launch-layout{display:grid;grid-template-columns:minmax(360px,440px) minmax(0,1fr);gap:var(--gap)}
+.launch-left,.form-card{padding:clamp(14px,1.7vw,20px)}.conf-group{border-bottom:1px solid var(--line);padding:12px 0}.conf-group:first-child{padding-top:0}.conf-group:last-child{border-bottom:0;padding-bottom:0}
+.launch-topline{display:flex;align-items:center;gap:12px;margin-bottom:18px;color:#a29b94;font-weight:900}.launch-topline button{border:0;background:transparent;color:#6f6861;font-weight:900;cursor:pointer;padding:0;font-size:1rem}.launch-topline span{color:#aaa39c}
+.launch-mode-summary{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.launch-empty{min-height:calc(100vh - 72px);display:grid;place-items:center;color:#a8a19a;text-align:center}.launch-empty h1{font-size:clamp(1.7rem,2.6vw,2.5rem);margin-bottom:8px;color:#2b2f35}.launch-empty p{margin:0;color:#8a837b}
+.mode-modal{width:min(920px,96vw);padding:clamp(18px,2.4vw,28px)}
+.mode-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.mode-card{position:relative;border:1px solid #eadfd4;border-radius:8px;background:linear-gradient(180deg,#fff,#fffaf7);padding:18px;min-height:270px;cursor:pointer;overflow:hidden;transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.mode-card:hover{transform:translateY(-2px);border-color:#ffcdb8;box-shadow:0 18px 42px rgba(68,45,25,.1)}
+.mode-card.primary{background:linear-gradient(180deg,#fff8f3,#fff)}
+.mode-card.flow{background:linear-gradient(180deg,#fff,#f8fbff)}
+.mode-card h3{font-size:1.25rem;margin-bottom:8px}.mode-card p{color:#6b645d;line-height:1.6;margin-bottom:14px}
+.mode-icon{width:42px;height:42px;border-radius:8px;background:#fff1ea;color:var(--orange);display:grid;place-items:center;margin-bottom:14px;border:1px solid #ffd4c3}
+.mode-icon svg{width:22px;height:22px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.mode-card.flow .mode-icon{background:#f3f8ff;color:var(--blue);border-color:#d6e7ff}
+.mode-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:14px 0}
+.mode-step{border:1px solid #efe4d8;background:rgba(255,255,255,.72);border-radius:8px;padding:8px;color:#5f5a54;font-size:.78rem;font-weight:900;text-align:center}
+.mode-preview{height:54px;border-radius:8px;border:1px solid #eee5db;background:repeating-linear-gradient(0deg,#fff7f1 0 2px,transparent 2px 18px),linear-gradient(90deg,rgba(239,107,61,.12),rgba(77,143,227,.08));position:relative;overflow:hidden}
+.mode-preview:after{content:"";position:absolute;left:14px;top:24px;width:42%;height:6px;border-radius:999px;background:var(--orange);box-shadow:78px 0 0 #efe4d8,150px 0 0 #efe4d8}
+.mode-card .btn{margin-top:14px;width:100%;box-shadow:none}
+.opts,.tabs{display:flex;flex-wrap:wrap;gap:8px}.opt{padding:8px 12px;border-radius:8px;border:1px solid #e4ddd4;background:#fff;color:#3c3935;font-weight:800;cursor:pointer}.opt.active{border-color:var(--orange);background:#fff3ec;color:var(--orange)}
+.intensity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.intensity{border:1px solid #e4ddd4;border-radius:8px;background:#fff;padding:12px;min-height:76px}.intensity.active{border-color:var(--orange);background:#fff3ec}.intensity .name{font-weight:900;margin-bottom:4px}.intensity .desc{font-size:.82rem;color:#817970;line-height:1.45}
+.launch-main{display:block}.field{margin-bottom:14px}.field label{display:block;font-weight:900;margin-bottom:8px}.field textarea{width:100%;border:1px solid #e2d9cf;border-radius:8px;background:#fff;padding:12px;min-height:108px;resize:vertical;outline:none}
+.upload{min-height:116px;border:1.5px dashed #cfc5ba;border-radius:8px;display:grid;place-items:center;text-align:center;color:#706a63;background:#fffdfb;padding:14px}
+.launch-confirm{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:var(--gap);padding:16px 18px;background:#fff8f2;border:1px solid #f4d8c8;border-radius:8px}
+.launch-confirm .meta{display:flex;gap:8px;flex-wrap:wrap}
+.full-flow{display:none;max-width:1240px;margin:0 auto}.full-flow.show{display:block}
+.flow-title{margin-bottom:22px}.flow-title h1{margin-bottom:6px}
+.flow-card{padding:clamp(18px,2.2vw,28px);margin-bottom:var(--gap)}
+.flow-step-title{display:flex;align-items:center;gap:12px;margin-bottom:20px}.step-dot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#cf6f3e;color:#fff;font-weight:900;flex:0 0 auto}
+.flow-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.flow-field label{display:block;font-weight:900;margin-bottom:8px}.fake-input{height:54px;border:1px solid #ded7cf;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 14px;color:#a09a94;font-weight:800}.fake-input strong{color:#2a2d32}
+.flow-card textarea{width:100%;min-height:94px;border:1px solid #ded7cf;border-radius:8px;background:#fff;padding:14px;resize:vertical;outline:none}
+.flow-upload{min-height:130px;border:1.5px dashed #d87443;border-radius:8px;display:grid;place-items:center;text-align:center;color:#7a746d;background:#fffdfb;margin-bottom:12px}.flow-upload b{display:block;color:#2c2f34;margin-top:8px}.flow-upload span{color:#9b948d}
+.flow-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:8px}.flow-actions .btn{min-width:150px;border-radius:999px}
+
+.preview-line{display:flex;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding:10px 0;color:#615b55}.preview-line b{color:#222;text-align:right}
+.warm-box{background:#fff8f2;border:1px solid #f4d8c8;border-radius:8px;padding:14px;margin-top:12px}.list-check{padding-left:0;list-style:none}.list-check li{margin:8px 0;color:#4e4944;line-height:1.45}.list-check li:before{content:"✓";color:var(--orange);font-weight:900;margin-right:8px}
+.modal-mask{display:none;position:fixed;inset:0;background:rgba(31,35,40,.24);z-index:100;align-items:center;justify-content:center;padding:14px}.modal-mask.show{display:flex}
+.modal{width:min(960px,96vw);max-height:90vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 28px 80px rgba(0,0,0,.18);padding:clamp(16px,2vw,22px)}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.modal-head h2{margin-bottom:4px}
+.source-trigger{position:absolute;right:18px;top:18px;z-index:12;border-color:#f0d8c8;background:#fffaf7;color:var(--orange);box-shadow:0 10px 24px rgba(68,45,25,.08)}
+.source-trigger svg{width:17px;height:17px;stroke:currentColor;stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.source-modal{width:min(1120px,96vw)}
+.source-code{margin:0;max-height:68vh;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#181b20;color:#eef2f7;padding:16px;font-size:.82rem;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.preview-modal-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.9fr);gap:var(--gap)}
+.ai-card{padding:16px}.interviewer{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:center;margin:12px 0}.interviewer img{width:96px;aspect-ratio:1/1;border-radius:8px;object-fit:cover;border:1px solid var(--line)}
+.avatar{width:36px;height:36px;border-radius:50%;background:#fff0ea;color:var(--orange);display:grid;place-items:center;font-weight:900;flex:0 0 auto}
+
+.drawer{position:fixed;right:-920px;top:0;width:min(860px,96vw);height:100dvh;background:#fff;z-index:120;border-left:1px solid var(--line);box-shadow:-18px 0 60px rgba(0,0,0,.14);transition:.25s;padding:clamp(14px,2vw,22px);overflow:auto}.drawer.show{right:0}
+.template-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,300px);gap:var(--gap)}.search{height:40px;border:1px solid #e1d9cf;border-radius:8px;padding:0 12px;width:100%;outline:none;background:#fff}
+.tpl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.tpl{border:1px solid #e6ded5;border-radius:8px;padding:12px;background:#fff;cursor:pointer}.tpl.active{border-color:var(--orange);background:#fff3ec}.tpl h4{margin:0 0 8px}.tpl p{margin:5px 0;color:#6d6862;font-size:.86rem;line-height:1.45}.tpl-preview{padding:16px;position:sticky;top:0;height:max-content}
+
+.profile-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);gap:var(--gap)}.profile-card{padding:clamp(14px,1.8vw,20px)}
+.match-card{display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:center}.score-circle{width:118px;height:118px;border-radius:50%;border:10px solid #f0d9ce;border-top-color:var(--orange);display:grid;place-items:center;text-align:center}.score-circle b{font-size:2rem}
+.risk-list{margin-top:10px}.risk{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fffaf7;border:1px solid #f1dfd3;border-radius:8px;padding:10px 12px;margin:8px 0}
+.strategy-table{border:1px solid #d8e6fb;border-radius:8px;overflow:hidden}.strategy-row{display:grid;grid-template-columns:132px minmax(0,1fr);border-bottom:1px solid #e0ecfb}.strategy-row:last-child{border-bottom:0}.strategy-row span,.strategy-row b{padding:10px 12px}.strategy-row span{background:#f5faff;color:#4d8fe3;font-weight:900}.strategy-row b{line-height:1.45}
+.optimize{display:flex;gap:12px;align-items:flex-start;border:1px solid #f1dfd3;background:#fffaf7;border-radius:8px;padding:12px;margin:10px 0}.profile-actions{display:flex;justify-content:center;gap:10px;margin-top:var(--gap);flex-wrap:wrap}
+
+.room-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;margin-bottom:var(--gap);flex-wrap:wrap}.room-body,.train-room-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,360px);gap:var(--gap)}
+.chat,.train-q{padding:clamp(16px,2vw,24px);min-height:480px}.ai-msg,.me-msg{display:flex;gap:12px;margin-bottom:16px}.bubble{border:1px solid var(--line);background:#fff;border-radius:8px;padding:14px;line-height:1.75;max-width:820px}.me-msg{justify-content:flex-end}.me-msg .bubble{background:#f5f9ff;border-color:#cfe0fa}.answer-box{border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px;margin-top:24px}.answer-box textarea{width:100%;height:92px;border:0;outline:0;resize:vertical}.side{display:flex;flex-direction:column;gap:var(--gap)}.side-card{padding:16px}.side-card li{margin:9px 0;color:#625d57}
+.training-hero{padding:clamp(26px,5vw,46px);text-align:center}.train-input{max-width:920px;margin:20px auto 0;display:flex;gap:10px;align-items:center;border:1.5px solid #ffd1bf;border-radius:8px;background:#fff;padding:8px}.train-input input{flex:1;border:0;outline:0;padding:0 12px;min-width:0}.recognition{margin:var(--gap) 0;padding:18px}.recognition-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.rec{border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px}.question-card{background:#fff9f5;border:1px solid #f4d8c8;border-radius:8px;padding:18px;margin:18px 0;line-height:1.75}
+.learn-search{height:44px;border:1px solid #e1d9cf;border-radius:8px;background:#fff;padding:0 14px;width:min(560px,100%)}.weak-grid,.plans,.member-top,.admin-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--gap)}
+.table-wrap{overflow:auto;border-radius:8px;border:1px solid var(--line)}.table{width:100%;border-collapse:collapse;min-width:650px;background:#fff}.table th,.table td{border-bottom:1px solid var(--line);padding:11px 12px;text-align:left;vertical-align:top}.table th{color:#77716b;font-weight:900;background:#fffaf7}
+.member-top{margin-bottom:var(--gap)}.plan .price{font-size:clamp(1.8rem,3vw,2.45rem);font-weight:900}.admin-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:var(--gap)}.sidebar{padding:14px}.side-nav{display:flex;gap:8px;align-items:center;padding:11px;border-radius:8px;font-weight:900;color:#5f5a54}.side-nav.active{background:#fff0ea;color:var(--orange)}.admin-main{padding:18px}.admin-filter{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}.admin-filter .search{width:auto;min-width:180px;flex:1}
+
+@media (max-width:980px){
+  .topbar{display:flex;align-items:center;flex-wrap:wrap}.brand{width:auto;justify-content:flex-start;margin-right:auto}.user{margin-left:auto}.nav{order:3;width:100%;justify-content:center;flex-wrap:wrap;overflow:visible}
+  .hero,.home-grid,.launch-layout,.profile-grid,.room-body,.train-room-layout,.admin-layout,.flow-fields{grid-template-columns:1fr}
+  .module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero-illus{display:none}.kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}.template-layout,.preview-modal-grid,.mode-grid{grid-template-columns:1fr}.tpl-preview{position:static}
+  .launch-confirm{align-items:flex-start;flex-direction:column}.room-top{align-items:flex-start}.side{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+}
+@media (min-width:1440px){
+  :root{--page:24px;--gap:18px}
+  .main{max-width:min(1840px,calc(100vw - 48px))}
+  .hero{grid-template-columns:minmax(0,1.18fr) minmax(420px,.82fr);padding:46px 56px}
+  .hero-illus{height:300px}
+  .module-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .home-grid{grid-template-columns:minmax(0,1.22fr) minmax(480px,.78fr)}
+  .metric-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  html{font-size:13px}.main{padding-bottom:32px}.page-head{flex-direction:column}.actions{width:100%;justify-content:flex-start}.btn{padding:9px 12px}
+  .hero{padding:20px}.module-grid,.quick-grid,.topic-grid,.review-grid{grid-template-columns:1fr}.module{min-height:132px}.kpi-row,.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.intensity-grid{grid-template-columns:1fr}
+  .showcase-ribbon{min-width:210px;font-size:.78rem}.showcase-screen{width:82%;height:122px}.showcase-ghost{display:none}
+  .progress-bars .row{grid-template-columns:1fr 1fr 42px}.resume-row,.match-card,.interviewer{grid-template-columns:1fr}.score-circle{margin:auto}.strategy-row{grid-template-columns:1fr}
+  .continue-inline{grid-template-columns:minmax(0,1fr) max-content}
+  .drawer{width:100vw}.modal-mask{padding:8px}.modal{width:100%;max-height:94vh}.answer-box>div{gap:8px;flex-direction:column}.train-input{flex-direction:column;align-items:stretch}.admin-filter .search{width:100%;min-width:0}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-icon">A</span><span>答岸 AI</span></div>
+  <nav class="nav" id="nav"></nav>
+  <div class="user"><span class="pill orange">免费版</span><span class="pill" id="headerUser">杨宇</span></div>
+</header>
+<main class="main">
+  <section class="screen active" id="home" data-title="首页">
+    <div class="card hero">
+      <button class="icon-btn source-trigger" type="button" title="查看源码" aria-label="查看源码" onclick="openSourceModal()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 9-4 3 4 3"/><path d="m16 9 4 3-4 3"/><path d="m14 5-4 14"/></svg>
+      </button>
+      <div>
+        <h1 id="greetingTitle">你好，<span data-user-name>杨宇</span> 👋🏻</h1>
+        <div class="hero-copy">
+          <p class="sub">把学习、训练和模拟面试放在一起，科学成长，高效拿到心仪 Offer。</p>
+          <div class="hero-pills"><span class="pill orange">真实面试场景</span><span class="pill blue">AI 智能陪练</span><span class="pill green">个性化提升方案</span></div>
+        </div>
+      </div>
+      <div class="hero-illus">
+        <div class="feature-carousel">
+          <div class="feature-slide is-active">
+            <div class="product-showcase" aria-label="发起面试">
+              <div class="showcase-ribbon">发起面试 INTERVIEW</div>
+              <div class="showcase-preview left"></div>
+              <div class="showcase-preview right"></div>
+              <div class="showcase-ghost left"></div>
+              <div class="showcase-ghost right"></div>
+              <div class="showcase-screen"><div class="sys-shot"><div class="sys-side"><span></span><span></span><span></span><span></span></div><div class="sys-main"><div class="sys-title">发起面试 / 面试配置</div><div class="sys-grid"><div class="sys-row">目标层级</div><div class="sys-row blue">视频面试</div></div><div class="sys-card">目标岗位描述 JD</div><div class="sys-card">简历上传 / 粘贴简历</div><div class="sys-progress"><i></i></div></div></div></div>
+              <div class="showcase-badge">画像<br/><span>84</span><small>生成</small></div>
+              <div class="showcase-phone"></div>
+              <div class="showcase-cursor"></div>
+              <div class="showcase-runner"></div>
+              <div class="showcase-shadow"></div>
+            </div>
+          </div>
+          <div class="feature-slide is-next">
+            <div class="product-showcase" aria-label="知识中心学习">
+              <div class="showcase-ribbon">知识中心学习 LEARNING</div>
+              <div class="showcase-preview left"></div>
+              <div class="showcase-preview right"></div>
+              <div class="showcase-ghost left"></div>
+              <div class="showcase-ghost right"></div>
+              <div class="showcase-screen"><div class="sys-shot"><div class="sys-side"><span></span><span></span><span></span><span></span></div><div class="sys-main"><div class="sys-title">学习中心</div><div class="sys-row green">推荐学习任务</div><div class="sys-grid"><div class="sys-card">JVM 核心专题</div><div class="sys-card">Java 并发专题</div><div class="sys-card">Redis 一致性</div><div class="sys-card">系统设计估算</div></div><div class="sys-progress"><i></i></div></div></div></div>
+              <div class="showcase-badge">掌握<br/><span>76</span><small>↑ 8</small></div>
+              <div class="showcase-phone"></div>
+              <div class="showcase-cursor"></div>
+              <div class="showcase-runner"></div>
+              <div class="showcase-shadow"></div>
+            </div>
+          </div>
+          <div class="feature-slide is-hidden">
+            <div class="product-showcase" aria-label="专项训练">
+              <div class="showcase-ribbon">专项训练 PRACTICE</div>
+              <div class="showcase-preview left"></div>
+              <div class="showcase-preview right"></div>
+              <div class="showcase-ghost left"></div>
+              <div class="showcase-ghost right"></div>
+              <div class="showcase-screen"><div class="sys-shot"><div class="sys-side"><span></span><span></span><span></span><span></span></div><div class="sys-main"><div class="sys-title">Redis 缓存一致性专项训练</div><div class="sys-card">本题：如何保证缓存与数据库一致性？</div><div class="sys-row blue">AI 教练追问中</div><div class="sys-grid"><div class="sys-row">跳过本题</div><div class="sys-row green">发送回答</div></div><div class="sys-progress"><i></i></div></div></div></div>
+              <div class="showcase-badge">进度<br/><span>2/8</span><small>训练</small></div>
+              <div class="showcase-phone"></div>
+              <div class="showcase-cursor"></div>
+              <div class="showcase-runner"></div>
+              <div class="showcase-shadow"></div>
+            </div>
+          </div>
+          <div class="feature-slide is-prev">
+            <div class="product-showcase" aria-label="复盘中心">
+              <div class="showcase-ribbon">复盘中心 REVIEW</div>
+              <div class="showcase-preview left"></div>
+              <div class="showcase-preview right"></div>
+              <div class="showcase-ghost left"></div>
+              <div class="showcase-ghost right"></div>
+              <div class="showcase-screen"><div class="sys-shot"><div class="sys-side"><span></span><span></span><span></span><span></span></div><div class="sys-main"><div class="sys-title">复盘中心</div><div class="sys-grid"><div class="sys-card">平均得分 78</div><div class="sys-card">复训率 62%</div></div><div class="sys-chart"></div><div class="sys-row">结构化表达专项突破计划</div><div class="sys-progress"><i></i></div></div></div></div>
+              <div class="showcase-badge">得分<br/><span>78</span><small>↑ 6</small></div>
+              <div class="showcase-phone"></div>
+              <div class="showcase-cursor"></div>
+              <div class="showcase-runner"></div>
+              <div class="showcase-shadow"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="module-grid">
+      <div class="card module"><h3>模拟面试 <span class="mini-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7.5h14"/><path d="M7 12h8"/><path d="M5 5h14v10H9l-4 4z"/></svg></span></h3><p>真实面试环境，AI 面试官全流程模拟，精准评估。</p><button class="btn ghost" onclick="switchPage('launch')">立即开始</button></div>
+      <div class="card module"><h3>专项训练 <span class="mini-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M5 8h14"/><path d="M7 16h10"/><path d="M5 4h14v16H5z"/></svg></span></h3><p>针对薄弱点专项突破，快速提升技术与表达能力。</p><button class="btn outline" onclick="switchPage('trainingStart')">去训练</button></div>
+      <div class="card module"><h3>学习中心 <span class="mini-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A3 3 0 0 1 7 4h13v15H7a3 3 0 0 0-3 3z"/><path d="M4 5.5V22"/><path d="M8 8h8"/></svg></span></h3><p>系统化学习知识点与面试方法，从基础到进阶。</p><button class="btn outline" onclick="switchPage('learning')">去学习</button></div>
+      <div class="card module"><h3>复盘中心 <span class="mini-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 15l3-4 3 2 4-6"/></svg></span></h3><p>查看训练结果与复盘分析，持续迭代提升。</p><button class="btn outline" onclick="switchPage('review')">去复盘</button></div>
+    </div>
+    <div class="home-grid">
+      <div class="card kpi">
+        <h3>我的进度</h3>
+        <p class="progress-note">这周状态不错，训练节奏比上周更稳定。建议继续接着上次的并发专题，把薄弱题再压一轮。</p>
+        <div class="metric-grid">
+          <div class="metric"><div class="label">本周训练</div><div class="metric-value"><strong>7</strong><span> 次</span></div><div class="metric-badge positive">↑ 上升 40%</div></div>
+          <div class="metric"><div class="label">累计天数</div><div class="metric-value"><strong>23</strong><span> 天</span></div><div class="metric-badge positive">👊🏻 坚持稳定</div></div>
+          <div class="metric"><div class="label">模拟面试</div><div class="metric-value"><strong>18</strong><span> 场</span></div><div class="metric-badge positive">超过 68%</div></div>
+          <div class="metric"><div class="label">复训率</div><div class="metric-value"><strong>68%</strong></div><div class="metric-badge positive">状态在线</div></div>
+        </div>
+        <div class="continue-inline">
+          <div>
+            <h4>继续上次训练</h4>
+            <div class="mini-meta"><b>Java 并发核心专题 · 错题本</b><span class="pill orange">12 / 20</span></div>
+            <div class="bar" style="max-width:360px;margin-top:8px"><i style="width:60%"></i></div>
+          </div>
+          <button class="btn ghost" onclick="switchPage('trainingRoom')">继续训练</button>
+        </div>
+      </div>
+      <div class="card kpi">
+        <h3>当前薄弱点 Top 3</h3>
+        <p class="progress-note">先不用贪多，优先处理下面三个最影响面试表现的点。</p>
+        <div class="weak-list">
+          <div class="weak-chip"><div><b>并发编程与线程安全</b><span class="hint">先复盘锁、线程池和共享变量边界</span><div class="bar"><i style="width:42%"></i></div></div><span class="score">42%</span></div>
+          <div class="weak-chip"><div><b>JVM 内存模型与 GC</b><span class="hint">建议补一次 GC 场景题和调优思路</span><div class="bar"><i style="width:58%"></i></div></div><span class="score">58%</span></div>
+          <div class="weak-chip"><div><b>系统设计 · 高并发场景</b><span class="hint">重点练容量估算、限流和降级表达</span><div class="bar"><i style="width:63%"></i></div></div><span class="score">63%</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="launch" data-title="发起面试">
+    <div class="launch-empty" id="launchEmpty"><div><h1>发起面试</h1><p>请选择本次面试方式，系统会进入对应配置流程。</p></div></div>
+    <div class="page-head" id="launchHeader"><div><div class="launch-topline"><button onclick="openInterviewTypeModal()">← 返回选择</button><span>|</span><strong id="launchModeCrumb">单次模拟面试</strong></div></div><div class="actions" id="singleLaunchActions"><button class="btn ghost" onclick="openTemplateDrawer()">使用模板</button><button class="btn outline">保存为模板</button></div></div>
+    <div class="launch-layout" id="singleLaunchForm">
+      <div class="card launch-left">
+        <div class="conf-group"><h3>1. 目标层级</h3><div class="opts"><span class="opt active">校招/应届生</span><span class="opt">1-3年经验</span><span class="opt">3-5年经验</span><span class="opt">资深/专家</span></div></div>
+        <div class="conf-group"><h3>2. 面试语言</h3><div class="opts"><span class="opt active">中文</span><span class="opt">英文</span></div></div>
+        <div class="conf-group"><h3>3. 面试方向</h3><div class="opts"><span class="opt active">综合面试</span><span class="opt">项目深挖</span><span class="opt">系统设计</span><span class="opt">行为面试</span><span class="opt">AI 应用开发</span></div></div>
+        <div class="conf-group"><h3>4. 面试强度 <span class="small">强度决定追问深度</span></h3><div class="intensity-grid"><div class="intensity"><div class="name">热身</div><div class="desc">引导更多，适合刚开始准备。</div></div><div class="intensity active"><div class="name">标准</div><div class="desc">真实节奏，接近常规面试。</div></div><div class="intensity"><div class="name">深挖</div><div class="desc">连续追问，找到真实边界。</div></div><div class="intensity"><div class="name">压力</div><div class="desc">打断质疑，模拟高压场景。</div></div></div></div>
+        <div class="conf-group"><h3>5. 面试模式</h3><div class="opts"><span class="opt active">文字面试</span><span class="opt">语音面试</span><span class="opt">视频面试 Beta</span></div></div>
+        <div class="conf-group"><h3>6. 自动结束方式</h3><div class="opts"><span class="opt active">按数量</span><span class="opt">按时长</span><span class="opt">不限</span></div><div class="opts" style="margin-top:10px"><span class="sub">题量</span><button class="opt">−</button><b>15</b><button class="opt">＋</button><span class="pill orange">25-35 分钟</span></div></div>
+      </div>
+      <div class="launch-main">
+        <div class="card form-card">
+          <div class="field"><label>目标岗位描述（JD）</label><textarea placeholder="请粘贴目标岗位的职位描述，例如：岗位职责、任职要求、核心能力、业务背景等..."></textarea><p class="small" style="text-align:right">0 / 2000</p></div>
+          <div class="field"><label>简历上传（可选）</label><div class="upload"><div><div style="font-size:1.6rem;color:var(--orange)">⇧</div><b>点击上传或拖拽文件到此处</b><p class="small">支持 PDF / DOC / DOCX / TXT，文件大小不超过 10MB</p></div></div></div>
+          <div class="field"><label>粘贴简历内容</label><textarea placeholder="请输入或粘贴简历内容（可选）&#10;我们会从教育背景、项目经历、技能等信息中提取关键点..." style="min-height:120px"></textarea><p class="small" style="text-align:right">0 / 5000</p></div>
+        </div>
+        <div class="launch-confirm">
+          <div><b id="launchConfirmTitle">配置完成后进入本场预览</b><p class="small" id="launchConfirmDesc" style="margin:4px 0 0">本场预览与 AI 面试官已移入确认弹窗，确认后再生成用户画像。</p></div>
+          <div class="meta"><span class="pill orange" id="launchMetaCount">15 道题</span><span class="pill orange">标准强度</span><span class="pill green" id="launchMetaDuration">25-35 分钟</span></div>
+          <button class="btn" onclick="openPreviewModal()">确认配置</button>
+        </div>
+      </div>
+    </div>
+    <div class="full-flow" id="fullFlowPlan">
+      <div class="flow-title"><h1>创建面试计划</h1><p class="sub">围绕目标岗位，配置模拟面试的完整流程。</p></div>
+      <div class="card flow-card">
+        <div class="flow-step-title"><span class="step-dot">1</span><h2>设定目标岗位</h2></div>
+        <div class="flow-fields">
+          <div class="flow-field"><label>目标公司（选填）</label><div class="fake-input">搜索公司...</div></div>
+          <div class="flow-field"><label>目标岗位</label><div class="fake-input"><strong>Java后端开发</strong><span>▣</span></div></div>
+          <div class="flow-field"><label>目标职级（选填）</label><div class="fake-input">请选择职级</div></div>
+        </div>
+      </div>
+      <div class="card flow-card">
+        <div class="flow-step-title"><span class="step-dot">2</span><h2>上传资料（所有轮次共享）</h2></div>
+        <div class="field"><label>目标岗位 JD</label><textarea placeholder="粘贴目标岗位的职责与要求（Must-have）..."></textarea></div>
+        <div class="field"><label>个人简历（Resume）</label><div class="flow-upload"><div><div style="font-size:1.5rem;color:var(--orange)">⇧</div><b>点击上传简历文件，或直接粘贴文本</b><span>支持 PDF / Markdown / TXT</span></div></div><textarea placeholder="也可以直接在此处粘贴简历内容..."></textarea></div>
+      </div>
+      <div class="flow-actions"><button class="btn outline" onclick="openInterviewTypeModal()">取消</button><button class="btn" onclick="openPreviewModal()">创建面试计划</button></div>
+    </div>
+  </section>
+
+  <section class="screen" id="profile" data-title="确认本场面试画像">
+    <div class="page-head"><div><h1>确认本场面试画像</h1><p class="sub">基于简历与职位描述的智能解析结果，确认面试策略与评估重点。</p></div><span class="pill">识别岗位：<b>高级 Java 研发工程师</b></span></div>
+    <div class="profile-grid">
+      <div class="card profile-card"><h2>岗位匹配提醒与优化建议</h2><div class="match-card"><div class="score-circle"><div><b>84</b><span>分</span><p class="small">匹配度</p></div></div><div><p class="sub">候选人具备扎实的 Java 基础与中大型项目经验，在微服务、并发编程、数据库、缓存等方面表现良好。建议重点关注系统设计深度、复杂问题拆解与落地能力。</p><b>简历风险点 / 匹配提醒</b><div class="risk-list"><div class="risk">缺少量化指标，项目成果可衡量性不足 <span>›</span></div><div class="risk">缺乏复杂系统设计案例，需验证架构能力 <span>›</span></div><div class="risk">高并发场景经验描述偏少，建议深挖落地细节 <span>›</span></div></div></div></div></div>
+      <div class="card profile-card"><h2 style="color:var(--blue)">本场策略</h2><div class="strategy-table"><div class="strategy-row"><span>题量</span><b>18 题（主观题 12 题 + 追问若干）</b></div><div class="strategy-row"><span>预计时长</span><b>60 分钟</b></div><div class="strategy-row"><span>重点模块</span><b>系统设计、并发编程、JVM、数据库、项目经验</b></div><div class="strategy-row"><span>追问深度</span><b>中-深，根据候选人答题情况动态调整</b></div><div class="strategy-row"><span>结束策略</span><b>达到时长上限 / 主观题完成且评分稳定</b></div></div></div>
+      <div class="card profile-card"><h2>简历可优化点</h2><div class="optimize"><b>📈</b><div><b>缺少量化指标</b><p class="sub">建议补充关键指标，如 QPS、耗时、吞吐量、节省成本等。</p></div></div><div class="optimize"><b>👤</b><div><b>个人贡献边界不清</b><p class="sub">建议使用 STAR 法则明确个人职责、决策与产出。</p></div></div><div class="optimize"><b>📦</b><div><b>系统设计案例偏弱</b><p class="sub">建议补充完整系统设计案例：背景、方案选型、权衡、结果。</p></div></div></div>
+      <div class="card profile-card"><h2>手动补充训练重点</h2><p class="sub">请输入你希望重点考察或训练的方向（选填）</p><textarea style="width:100%;height:150px;border:1px solid #e2d9cf;border-radius:8px;padding:12px;resize:vertical" placeholder="例如：重点考察分布式事务与一致性、高并发下的性能优化、消息中间件实战、代码规范与工程化能力等。"></textarea></div>
+    </div>
+    <div class="profile-actions"><button class="btn outline" onclick="switchPage('launch',{skipModePrompt:true})">返回修改</button><button class="btn" onclick="switchPage('interviewRoom')">开始本场模拟</button></div>
+  </section>
+
+  <section class="screen" id="interviewRoom" data-title="模拟面试房间">
+    <div class="room-top card"><div class="opts"><span class="pill">高级 Java 研发工程师</span><span class="pill blue">文字面试</span></div><div><b>第 2 题 / 共 5 题</b> <span style="display:inline-block;width:140px;margin-left:10px" class="bar"><i style="width:40%"></i></span></div><div class="opts"><span class="pill orange">00:18:36</span><button class="btn">结束并生成报告</button></div></div>
+    <div class="room-body"><div class="card chat"><div class="ai-msg"><span class="avatar">AI</span><div class="bubble"><b>AI 面试官</b><span class="small"> 14:32</span><p>在高并发场景下设计一个秒杀系统，要求支持每秒 10 万 QPS 的请求，保证库存不超卖，并且尽量提升下单成功率。请说明整体架构、关键模块、数据一致性、流量控制与降级策略。</p></div></div><div class="me-msg"><div class="bubble"><p>好的，我将从整体架构、核心流程、Redis 一致性、流量控制、监控压测几个方面来设计。</p></div><span class="avatar" style="background:#eef3ff;color:#6177aa">我</span></div><div class="answer-box"><textarea placeholder="请输入你的回答..."></textarea><div style="display:flex;justify-content:space-between"><div class="opts"><button class="btn outline">跳过本题</button><button class="btn outline">我不知道</button><button class="btn outline">要一个提示</button></div><button class="btn">发送回答</button></div></div></div><div class="side"><div class="card side-card"><h3>本题考察点</h3><ul><li>高并发系统设计与架构能力</li><li>Redis 在秒杀场景的应用</li><li>数据一致性与防超卖方案</li><li>流量控制与降级容错策略</li></ul></div><div class="card side-card"><h3>回答建议结构</h3><ul><li>整体架构设计</li><li>核心流程与关键模块</li><li>Redis 设计与一致性保证</li><li>监控、压测与优化</li></ul></div></div></div>
+  </section>
+
+  <section class="screen" id="trainingStart" data-title="专项训练"><div class="card training-hero"><span class="pill orange">专项训练</span><h1>想练什么，直接告诉 AI 教练</h1><p class="sub">输入岗位、知识点或问题，系统会识别训练目标并生成针对性练习。</p><div class="train-input"><input placeholder="例如：Java 后端 Redis 缓存一致性"/><button class="btn" onclick="switchPage('trainingRoom')">开始训练</button></div></div><div class="card recognition"><h2>系统识别结果</h2><div class="recognition-grid"><div class="rec"><p class="small">岗位方向</p><b>Java 后端</b></div><div class="rec"><p class="small">核心专题</p><b>Redis</b></div><div class="rec"><p class="small">能力维度</p><b>系统设计</b></div><div class="rec"><p class="small">建议强度</p><b>标准</b></div><div class="rec"><p class="small">题量</p><b>8 题</b></div></div></div><div class="quick-grid"><div class="quick"><b>JVM 内存模型</b><p class="sub">适合快速补强原理题</p></div><div class="quick"><b>Java 并发核心</b><p class="sub">锁、线程池与并发容器</p></div><div class="quick"><b>Redis 一致性</b><p class="sub">缓存穿透、击穿、雪崩</p></div><div class="quick"><b>系统设计容量估算</b><p class="sub">从业务量到架构选型</p></div></div></section>
+
+  <section class="screen" id="trainingRoom" data-title="专项训练房间"><div class="page-head"><div><h1>Redis 缓存一致性专项训练</h1><p class="sub">当前题目 2 / 8 · 本次训练无硬性自动停止</p></div><div class="actions"><span class="pill">已用时 16:24</span><button class="btn">结束并生成报告</button></div></div><div class="train-room-layout"><div class="card train-q"><div class="ai-msg"><span class="avatar">AI</span><div style="line-height:1.75"><b>AI 教练</b><p>请认真思考，尽量完整作答。如果遇到不确定的地方，也可以先说出你的想法。</p></div></div><div class="question-card"><span class="pill orange">本题</span><h2>在电商系统中，如何保证 Redis 缓存与数据库的一致性？</h2><p>请结合实际场景，说明可能出现的数据不一致问题，并给出至少 2 种解决方案，分析各自优缺点及适用场景。</p></div><div class="answer-box"><textarea placeholder="在此输入你的回答"></textarea><div style="display:flex;justify-content:space-between"><button class="btn outline">清空</button><div class="opts"><button class="btn outline">跳过本题</button><button class="btn outline">我不知道</button><button class="btn">发送回答</button></div></div></div></div><div class="side"><div class="card side-card"><h3>训练上下文</h3><p class="sub">你是一名具备 3 年经验的 Java 后端开发工程师，目前负责电商系统的商品服务模块。</p></div><div class="card side-card"><h3>能力维度</h3><span class="pill blue">系统设计</span> <span class="pill blue">高并发处理</span></div><div class="card side-card"><h3>本题考察点</h3><ul><li>缓存与数据库一致性问题</li><li>常见解决方案的掌握与对比</li><li>工程实践经验与落地能力</li></ul></div></div></div></section>
+
+  <section class="screen" id="learning" data-title="学习中心"><div class="page-head"><div><h1>学习中心</h1><p class="sub">系统化学习，高效提升面试竞争力。</p></div><button class="btn outline">学习记录</button></div><input class="learn-search" placeholder="搜索专题名称、关键词"/><div class="opts" style="margin:var(--gap) 0"><span class="opt active">全部</span><span class="opt">JVM</span><span class="opt">Java 并发</span><span class="opt">Redis</span><span class="opt">MySQL</span><span class="opt">系统设计</span><span class="opt">AI 应用开发</span></div><div class="card kpi"><h2>推荐学习任务</h2><div class="quick-grid"><div class="quick"><b>01 JVM 内存模型深入剖析</b><p class="sub">建议优先学习</p></div><div class="quick"><b>02 Java 并发编程核心原理</b><p class="sub">建议优先学习</p></div><div class="quick"><b>03 Redis 缓存一致性</b><p class="sub">建议复盘后学习</p></div><div class="quick"><b>04 系统设计容量估算</b><p class="sub">建议专项突破</p></div></div></div><div class="topic-grid"><div class="card topic"><h3>JVM 核心专题</h3><span class="pill blue">Java 后端</span><p>深入理解 JVM 运行机制与内存管理原理。</p><button class="btn outline">进入</button></div><div class="card topic"><h3>Java 并发核心专题</h3><span class="pill green">Java 后端</span><p>掌握并发编程核心原理与高并发解决方案。</p><button class="btn outline">进入</button></div><div class="card topic"><h3>Redis 核心专题</h3><span class="pill orange">Java 后端</span><p>Redis 核心原理与高性能应用实战。</p><button class="btn outline">进入</button></div><div class="card topic"><h3>MySQL 核心专题</h3><span class="pill purple">Java 后端</span><p>掌握 MySQL 优化与高可用架构设计。</p><button class="btn outline">进入</button></div></div></section>
+
+  <section class="screen" id="review" data-title="复盘中心"><div class="card hero" style="margin-bottom:var(--gap)"><div><h1>复盘中心</h1><p class="sub">全面回顾训练表现，发现薄弱点，精准提升面试竞争力。</p></div><div class="hero-illus"></div></div><div class="review-grid"><div class="card kpi"><p class="sub">本周训练次数</p><b>7</b><span> 次</span><p class="small">较上周 ↑ 40%</p></div><div class="card kpi"><p class="sub">平均得分</p><b>78</b><span> 分</span><p class="small">较上周 ↑ 6分</p></div><div class="card kpi"><p class="sub">当前薄弱维度</p><b style="font-size:1.25rem">结构化表达</b><p class="small">近3次得分低于团队均值 12分</p></div><div class="card kpi"><p class="sub">7日复训率</p><b>62%</b></div></div><div class="card kpi" style="margin-top:var(--gap)"><h2>高频薄弱维度</h2><div class="weak-grid"><div class="weak card"><h3>结构化表达 <span class="pill orange">高频</span></h3><p class="sub">问题拆解、逻辑组织与结论呈现不足。</p><button class="btn ghost">专项突破</button></div><div class="weak card"><h3>证据充分性 <span class="pill blue">高频</span></h3><p class="sub">案例中量化指标、对比数据不足。</p><button class="btn outline">专项突破</button></div><div class="weak card"><h3>技术深度 <span class="pill orange">高频</span></h3><p class="sub">核心原理与底层机制阐述深度不足。</p><button class="btn outline">专项突破</button></div></div></div><div class="home-grid"><div class="card kpi"><h2>历史训练记录</h2><div class="table-wrap"><table class="table"><tr><th>训练时间</th><th>类型</th><th>方向</th><th>得分</th><th>薄弱维度</th><th>操作</th></tr><tr><td>2026/05/08 14:32</td><td>模拟面试</td><td>Java 开发工程师</td><td>82 分</td><td>证据充分性</td><td style="color:var(--orange)">查看详情</td></tr><tr><td>2026/05/07 20:15</td><td>专项训练</td><td>并发编程</td><td>68 分</td><td>结构化表达</td><td style="color:var(--orange)">查看详情</td></tr></table></div></div><div class="card kpi"><h2>推荐补强计划</h2><div class="risk"><b>01 结构化表达专项突破计划</b><button class="btn ghost">开始</button></div><div class="risk"><b>02 证据充分性提升计划</b><button class="btn outline">开始</button></div></div></div></section>
+
+  <section class="screen" id="member" data-title="会员管理"><div class="member-top"><div class="card kpi"><span class="pill orange">当前套餐</span><h1>免费版</h1><p class="sub">解锁更多面试次数与高级功能，助力你更高效地提升面试能力。</p><button class="btn">升级套餐</button></div><div class="card kpi"><h2>本月使用情况</h2><div class="review-grid"><div><p class="sub">已使用面试</p><b>7 次</b></div><div><p class="sub">剩余次数</p><b>3 次</b></div><div><p class="sub">下次重置</p><b style="font-size:1.35rem">2026-06-01</b></div></div></div></div><div class="plans"><div class="card plan"><h2>免费版</h2><div class="price">¥0 <span class="small">/月</span></div><p class="sub">适合初步体验答岸 AI。</p><ul class="list-check"><li>每月 10 次模拟面试</li><li>基础岗位题库</li><li>基础面试反馈</li></ul><button class="btn outline" style="width:100%">当前套餐</button></div><div class="card plan" style="border-color:var(--orange);background:#fffaf6"><span class="pill orange">推荐</span><h2>专业版</h2><div class="price">¥39 <span class="small">/月</span></div><p class="sub">适合求职进阶用户。</p><ul class="list-check"><li>每月 30 次模拟面试</li><li>全量岗位题库</li><li>深度复盘报告</li></ul><button class="btn" style="width:100%">选择专业版</button></div><div class="card plan"><h2>企业版</h2><div class="price">¥399 <span class="small">/月起</span></div><p class="sub">适合团队与企业。</p><ul class="list-check"><li>无限次模拟面试</li><li>企业题库管理</li><li>数据导出</li></ul><button class="btn outline" style="width:100%">联系销售</button></div></div><div class="card kpi" style="margin-top:var(--gap)"><h2>核心功能对比</h2><div class="table-wrap"><table class="table"><tr><th>功能</th><th>免费版</th><th>专业版</th><th>企业版</th></tr><tr><td>模拟面试次数 / 月</td><td>10 次</td><td>30 次</td><td>无限次</td></tr><tr><td>专项训练</td><td>基础专项</td><td>全量专项</td><td>自定义专项</td></tr><tr><td>能力画像</td><td>基础反馈</td><td>个人能力雷达图</td><td>团队能力画像</td></tr></table></div></div></section>
+
+  <section class="screen" id="admin" data-title="学习后台"><div class="admin-layout"><div class="card sidebar"><h2>学习后台</h2><div class="side-nav active">▰ 题库管理</div><div class="side-nav">📖 知识点管理</div><div class="side-nav">📋 Rubric 管理</div><div class="side-nav">◎ 训练数据</div></div><div class="card admin-main"><h1>题库管理</h1><p class="sub">管理和维护专项题库，支持题目组织、审核与统计分析。</p><div class="admin-kpis"><div class="card kpi"><p class="sub">题库总数</p><b>128</b></div><div class="card kpi"><p class="sub">本周新增</p><b>18</b></div><div class="card kpi"><p class="sub">待审核</p><b>32</b></div></div><div class="admin-filter"><input class="search" placeholder="搜索专题名称"/><select class="search"><option>方向：全部</option></select><select class="search"><option>状态：全部</option></select><button class="btn outline">导出</button><button class="btn">新建专题</button></div><div class="table-wrap"><table class="table"><tr><th>专题名称</th><th>方向</th><th>题目数</th><th>最近更新</th><th>状态</th><th>操作</th></tr><tr><td><b>JVM 核心专题</b><p class="small">JVM 内存模型、垃圾回收、类加载机制等</p></td><td><span class="pill orange">后端开发</span></td><td>128</td><td>2026/05/08</td><td>已发布</td><td>编辑</td></tr><tr><td><b>Redis 核心专题</b><p class="small">数据结构、持久化、分布式锁、缓存淘汰等</p></td><td><span class="pill purple">中间件</span></td><td>96</td><td>2026/05/07</td><td>已发布</td><td>编辑</td></tr></table></div></div></div></section>
+</main>
+
+<div class="modal-mask" id="interviewTypeModal">
+  <div class="modal mode-modal">
+    <div class="modal-head"><div><h2>选择面试方式</h2><p class="sub">先确定这次训练的节奏，再进入配置。你可以随时在发起面试页切换。</p></div></div>
+    <div class="mode-grid">
+      <div class="mode-card primary" onclick="selectInterviewMode('single')">
+        <div class="mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14"/><path d="M7 12h7"/><path d="M5 5h14v10H9l-4 4z"/></svg></div>
+        <h3>单次模拟面试</h3>
+        <p>适合针对一个岗位或一个 JD 快速开练，重点完成本场题目、AI 追问和面试画像。</p>
+        <div class="mode-steps"><span class="mode-step">配置岗位</span><span class="mode-step">AI 面试</span><span class="mode-step">生成画像</span></div>
+        <div class="mode-preview"></div>
+        <button class="btn">选择单次模拟</button>
+      </div>
+      <div class="mode-card flow" onclick="selectInterviewMode('full')">
+        <div class="mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h4v4H4z"/><path d="M16 6h4v4h-4z"/><path d="M4 16h4v4H4z"/><path d="M8 8h8"/><path d="M18 10v4a4 4 0 0 1-4 4H8"/></svg></div>
+        <h3>全流程面试</h3>
+        <p>适合完整模拟真实招聘链路，从简历解析、岗位匹配到多轮面试和复盘提升。</p>
+        <div class="mode-steps"><span class="mode-step">简历解析</span><span class="mode-step">多轮面试</span><span class="mode-step">复盘计划</span></div>
+        <div class="mode-preview"></div>
+        <button class="btn ghost">选择全流程</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer" id="templateDrawer">
+  <div class="modal-head"><div><h2>选择面试模板</h2><p class="sub">选择一个常见面试场景，系统会自动填充目标层级、方向、强度、题量和追问策略。</p></div><button class="icon-btn" onclick="closeTemplateDrawer()">×</button></div>
+  <div class="template-layout">
+    <div><input class="search" placeholder="搜索模板，例如：Java、校招、系统设计、AI 应用开发"/><div class="tabs"><span class="opt active">全部</span><span class="opt">校招</span><span class="opt">社招</span><span class="opt">高阶</span><span class="opt">AI 岗</span><span class="opt">英文</span><span class="opt">HR</span><span class="opt">我的模板</span></div><h3>官方推荐模板</h3><div class="tpl-grid"><div class="tpl"><h4>校招后端一面</h4><span class="pill blue">校招</span><p>适合：应届生 / 实习生</p><p>重点：基础知识、项目、算法表达</p><p>题量：8-12 题　时长：30 分钟</p></div><div class="tpl active"><h4>社招 Java 项目深挖</h4><span class="pill orange">社招</span> <span class="pill orange">深挖</span><p>适合：1-5 年 Java 后端开发</p><p>重点：项目职责、技术选型、线上排障</p><p>题量：8-10 题　时长：45 分钟</p></div><div class="tpl"><h4>高级后端系统设计</h4><span class="pill green">高阶</span> <span class="pill orange">压力</span><p>适合：3 年以上 / 高级岗位</p><p>重点：架构设计、容量估算、高可用</p><p>题量：3-5 题　时长：60 分钟</p></div><div class="tpl"><h4>AI 应用开发面试</h4><span class="pill purple">AI 岗</span><p>重点：模型应用、工程化、落地方案</p><p>题量：6-8 题　时长：45 分钟</p></div><div class="tpl"><h4>英文技术面试</h4><span class="pill green">英文</span><p>适合：外企 / 海外岗位</p><p>题量：8-12 题　时长：45 分钟</p></div><div class="tpl"><h4>HR 行为面试</h4><span class="pill blue">HR</span><p>重点：职业动机、行为表现、价值观</p><p>题量：8-10 题　时长：30 分钟</p></div></div><h3 style="margin-top:16px">我的模板</h3><div class="tpl-grid"><div class="tpl"><h4>上次使用的配置</h4><p>使用于 2 天前</p><p>题量：12 题　强度：深挖</p></div><div class="tpl"><h4>字节后端冲刺模板</h4><p>使用于 1 周前</p><p>题量：10 题　强度：压力</p></div></div></div>
+    <div class="card tpl-preview"><h3>模板预览</h3><h2>社招 Java 项目深挖</h2><span class="pill blue">社招</span> <span class="pill orange">深挖</span><h4>适合人群</h4><p class="sub">1-5 年 Java 后端开发</p><h4>考察重点</h4><ul class="list-check"><li>项目职责与贡献</li><li>技术选型与架构设计</li><li>线上问题排查与优化</li><li>技术难点与解决方案</li></ul><h4>将自动填充</h4><p class="sub">目标层级：3-5 年经验<br/>面试方向：项目深挖<br/>面试强度：深挖<br/>面试模式：文字面试<br/>题量：8-10 题<br/>预计时长：45 分钟</p><div class="actions" style="justify-content:flex-start"><button class="btn outline" onclick="closeTemplateDrawer()">取消</button><button class="btn" onclick="closeTemplateDrawer()">应用模板</button></div></div>
+  </div>
+</div>
+
+<div class="modal-mask" id="previewModal">
+  <div class="modal">
+    <div class="modal-head"><div><h2>本场预览与 AI 面试官</h2><p class="sub">确认本场面试策略后，系统将生成用户画像。</p></div><button class="icon-btn" onclick="closePreviewModal()">×</button></div>
+    <div class="preview-modal-grid">
+      <div class="card ai-card"><h3>本场预览</h3><div class="preview-line"><span>目标层级</span><b>校招 / 应届生</b></div><div class="preview-line"><span>面试方向</span><b>综合面试</b></div><div class="preview-line"><span>面试强度</span><b>标准</b></div><div class="preview-line"><span>题量</span><b>15 道题</b></div><div class="preview-line"><span>预计时长</span><b>25-35 分钟</b></div><div class="preview-line"><span>追问策略</span><b>由浅入深</b></div></div>
+      <div class="card ai-card"><h3>AI 面试官</h3><div class="interviewer"><img src="assets/ai-interviewer.png" alt="AI 面试官形象照"/><div><b>专业面试官 · 小岸</b><p class="small">擅长后端技术、项目深挖、系统设计</p></div></div><h4>面试特点</h4><ul class="list-check"><li>多轮追问，深入挖掘项目细节</li><li>关注技术选型与架构权衡</li><li>结合实际场景追问落地方案</li></ul></div>
+    </div>
+    <div class="warm-box"><b>点击确认后，将根据 JD 与简历生成用户画像，并展示岗位匹配度、风险点与本场策略。</b></div>
+    <div class="actions" style="margin-top:14px"><button class="btn outline" onclick="closePreviewModal()">返回修改</button><button class="btn" onclick="closePreviewModal();switchPage('profile')">确认并生成用户画像</button></div>
+  </div>
+</div>
+
+<div class="modal-mask" id="sourceModal">
+  <div class="modal source-modal">
+    <div class="modal-head"><div><h2>页面源码</h2><p class="sub">当前首页对应的 HTML / CSS / JS 源码。</p></div><button class="icon-btn" onclick="closeSourceModal()">×</button></div>
+    <pre class="source-code" id="sourceCode"></pre>
+  </div>
+</div>
+
+<script>
+const pages=[['home','首页'],['launch','发起面试'],['trainingStart','专项训练'],['learning','学习中心'],['review','复盘中心'],['member','会员管理'],['admin','学习后台']];
+let currentPage='home';
+let selectedInterviewMode='single';
+let hasSelectedInterviewMode=false;
+const nav=document.getElementById('nav');
+pages.forEach(([id,name])=>{const b=document.createElement('button');b.textContent=name;b.onclick=()=>switchPage(id);b.id='nav_'+id;nav.appendChild(b)});
+function getCurrentUserName(){
+  return window.currentUserName || localStorage.getItem('currentUserName') || localStorage.getItem('userName') || '杨宇';
+}
+function getGreetingText(name){
+  const hour=new Date().getHours();
+  if(hour>=0 && hour<6) return `再努力也要记得休息，${name}`;
+  if(hour<11) return `早上好，${name} 👋🏻`;
+  if(hour<14) return `中午好，${name} 👋🏻`;
+  if(hour<18) return `下午好，${name} 👋🏻`;
+  return `晚上好，${name} 👋🏻`;
+}
+function applyUserName(){
+  const name=getCurrentUserName();
+  document.querySelectorAll('[data-user-name]').forEach(el=>el.textContent=name);
+  document.getElementById('headerUser').textContent=name;
+  document.getElementById('greetingTitle').textContent=getGreetingText(name);
+}
+function switchPage(id,options={}){
+  if(id!=='launch') closeInterviewTypeModal();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const target=document.getElementById(id);
+  if(!target) return;
+  target.classList.add('active');
+  currentPage=id;
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  const navId=id==='profile'||id==='interviewRoom'?'launch':id==='trainingRoom'?'trainingStart':id;
+  const nb=document.getElementById('nav_'+navId);
+  if(nb) nb.classList.add('active');
+  if(id==='launch') applyLaunchMode();
+  window.scrollTo({top:0,behavior:'smooth'});
+  if(id==='launch' && !options.skipModePrompt) openInterviewTypeModal();
+}
+function openInterviewTypeModal(){
+  hasSelectedInterviewMode=false;
+  applyLaunchMode();
+  document.getElementById('interviewTypeModal').classList.add('show');
+}
+function closeInterviewTypeModal(){document.getElementById('interviewTypeModal').classList.remove('show')}
+function selectInterviewMode(mode){
+  selectedInterviewMode=mode;
+  hasSelectedInterviewMode=true;
+  closeInterviewTypeModal();
+  switchPage('launch',{skipModePrompt:true});
+}
+function applyLaunchMode(){
+  const single=selectedInterviewMode==='single';
+  document.getElementById('launchEmpty').style.display=hasSelectedInterviewMode?'none':'grid';
+  document.getElementById('launchHeader').style.display=hasSelectedInterviewMode?'flex':'none';
+  document.getElementById('launchModeCrumb').textContent=single?'单次模拟面试':'全流程面试计划';
+  document.getElementById('singleLaunchForm').style.display=hasSelectedInterviewMode && single?'grid':'none';
+  document.getElementById('singleLaunchActions').style.display=hasSelectedInterviewMode && single?'flex':'none';
+  document.getElementById('fullFlowPlan').classList.toggle('show',hasSelectedInterviewMode && !single);
+  document.getElementById('launchConfirmTitle').textContent=single?'配置完成后进入本场预览':'配置完成后进入全流程预览';
+  document.getElementById('launchConfirmDesc').textContent=single?'本场预览与 AI 面试官已移入确认弹窗，确认后再生成用户画像。':'系统会先生成流程安排与 AI 面试官配置，确认后进入用户画像和多轮面试计划。';
+  document.getElementById('launchMetaCount').textContent=single?'15 道题':'5 个环节';
+  document.getElementById('launchMetaDuration').textContent=single?'25-35 分钟':'60-90 分钟';
+}
+function openTemplateDrawer(){document.getElementById('templateDrawer').classList.add('show')}
+function closeTemplateDrawer(){document.getElementById('templateDrawer').classList.remove('show')}
+function openPreviewModal(){document.getElementById('previewModal').classList.add('show')}
+function closePreviewModal(){document.getElementById('previewModal').classList.remove('show')}
+function getPageSource(){
+  const clone=document.documentElement.cloneNode(true);
+  clone.querySelector('#sourceModal')?.classList.remove('show');
+  const sourceCode=clone.querySelector('#sourceCode');
+  if(sourceCode) sourceCode.textContent='';
+  return '<!doctype html>\n'+clone.outerHTML;
+}
+function openSourceModal(){
+  document.getElementById('sourceCode').textContent=getPageSource();
+  document.getElementById('sourceModal').classList.add('show');
+}
+function closeSourceModal(){document.getElementById('sourceModal').classList.remove('show')}
+function setupHeroCarousel(){
+  const slides=[...document.querySelectorAll('.feature-slide')];
+  if(!slides.length) return;
+  let active=0;
+  const paint=()=>{
+    slides.forEach((slide,index)=>{
+      slide.classList.remove('is-active','is-prev','is-next','is-hidden');
+      const prev=(active-1+slides.length)%slides.length;
+      const next=(active+1)%slides.length;
+      if(index===active) slide.classList.add('is-active');
+      else if(index===prev) slide.classList.add('is-prev');
+      else if(index===next) slide.classList.add('is-next');
+      else slide.classList.add('is-hidden');
+    });
+  };
+  paint();
+  window.setInterval(()=>{active=(active+1)%slides.length;paint();},5200);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeTemplateDrawer();closePreviewModal();closeSourceModal();}});
+applyUserName();
+applyLaunchMode();
+setupHeroCarousel();
+switchPage('home');
+</script>
+</body>
+</html>

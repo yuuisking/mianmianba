@@ -1,0 +1,589 @@
+{
+  "runs": [
+    {
+      "id": "run-moynvkxp-bffgir",
+      "kbId": "bank-jvm",
+      "topic": "JVM",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T18:12:20.797Z",
+      "updatedAt": "2026-05-09T18:12:20.799Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 13,
+      "completedQuestions": 13,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.798Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.798Z",
+          "detail": "已生成 13 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.798Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.798Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.799Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.799Z",
+          "detail": "已发布 4 个分类、13 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 13,
+        "published": true
+      }
+    },
+    {
+      "id": "run-moynvku1-pws899",
+      "kbId": "bank-java20-5-9-6-58-91",
+      "topic": "Java 并发",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T18:12:20.665Z",
+      "updatedAt": "2026-05-09T18:12:20.667Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 14,
+      "completedQuestions": 14,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.665Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.665Z",
+          "detail": "已生成 14 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.666Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.666Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.666Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.666Z",
+          "detail": "已发布 4 个分类、14 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 14,
+        "published": true
+      }
+    },
+    {
+      "id": "run-moynvkqx-gd4wxy",
+      "kbId": "bank-redis",
+      "topic": "Redis",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T18:12:20.553Z",
+      "updatedAt": "2026-05-09T18:12:20.554Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 14,
+      "completedQuestions": 14,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.553Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.553Z",
+          "detail": "已生成 14 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.553Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.553Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.554Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.554Z",
+          "detail": "已发布 4 个分类、14 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 14,
+        "published": true
+      }
+    },
+    {
+      "id": "run-moynvkoc-62kfr1",
+      "kbId": "bank-mysql",
+      "topic": "MySQL",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T18:12:20.460Z",
+      "updatedAt": "2026-05-09T18:12:20.463Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 14,
+      "completedQuestions": 14,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.461Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.461Z",
+          "detail": "已生成 14 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.461Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.462Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.462Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:12:20.462Z",
+          "detail": "已发布 4 个分类、14 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 14,
+        "published": true
+      }
+    },
+    {
+      "id": "run-moynlz5j-27c23a",
+      "kbId": "bank-javascript",
+      "topic": "JavaScript",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T18:04:52.663Z",
+      "updatedAt": "2026-05-09T18:04:52.665Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 13,
+      "completedQuestions": 13,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:52.664Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:52.664Z",
+          "detail": "已生成 13 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:52.665Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:52.665Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:52.665Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:52.665Z",
+          "detail": "已发布 4 个分类、13 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 13,
+        "published": true
+      }
+    },
+    {
+      "id": "run-moynlozl-p67ztc",
+      "kbId": "bank-javascript",
+      "topic": "JavaScript",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T18:04:39.489Z",
+      "updatedAt": "2026-05-09T18:04:39.490Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 13,
+      "completedQuestions": 13,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:39.489Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:39.489Z",
+          "detail": "已生成 13 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:39.489Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:39.490Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:39.490Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T18:04:39.490Z",
+          "detail": "已发布 4 个分类、13 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 13,
+        "published": true
+      }
+    },
+    {
+      "id": "run-moyn9z3x-pzl1fq",
+      "kbId": "bank-javascript",
+      "topic": "JavaScript",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T17:55:32.733Z",
+      "updatedAt": "2026-05-09T17:55:32.735Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 13,
+      "completedQuestions": 13,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:32.733Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:32.734Z",
+          "detail": "已生成 13 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:32.734Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:32.734Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:32.734Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:32.735Z",
+          "detail": "已发布 4 个分类、13 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 13,
+        "published": true
+      }
+    },
+    {
+      "id": "run-moyn9avi-oxlk8d",
+      "kbId": "bank-javascript",
+      "topic": "JavaScript",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T17:55:01.326Z",
+      "updatedAt": "2026-05-09T17:55:01.328Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 13,
+      "completedQuestions": 13,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:01.327Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:01.327Z",
+          "detail": "已生成 13 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:01.327Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:01.327Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:01.327Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:55:01.327Z",
+          "detail": "已发布 4 个分类、13 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 13,
+        "published": true
+      }
+    },
+    {
+      "id": "run-moyn8ti5-lznf99",
+      "kbId": "bank-javascript",
+      "topic": "JavaScript",
+      "mode": "manual",
+      "status": "completed",
+      "createdAt": "2026-05-09T17:54:38.813Z",
+      "updatedAt": "2026-05-09T17:54:38.814Z",
+      "currentStageKey": "publisher",
+      "totalQuestions": 13,
+      "completedQuestions": 13,
+      "warnings": [],
+      "error": null,
+      "acceptedSources": [],
+      "rejectedSources": [],
+      "stages": [
+        {
+          "key": "architect",
+          "label": "架构师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:54:38.813Z",
+          "detail": "已按预置正式模板规划题库结构。"
+        },
+        {
+          "key": "questioner",
+          "label": "出题员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:54:38.813Z",
+          "detail": "已生成 13 道首批题目。"
+        },
+        {
+          "key": "answerer",
+          "label": "答案师",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:54:38.813Z",
+          "detail": "已写入首版结构化答案。"
+        },
+        {
+          "key": "reviewer",
+          "label": "审核员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:54:38.813Z",
+          "detail": "已通过首版发布门槛校验。"
+        },
+        {
+          "key": "linker",
+          "label": "关联员",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:54:38.814Z",
+          "detail": "已补齐基础分类关联。"
+        },
+        {
+          "key": "publisher",
+          "label": "发布器",
+          "status": "completed",
+          "updatedAt": "2026-05-09T17:54:38.814Z",
+          "detail": "已发布 4 个分类、13 道题目。"
+        }
+      ],
+      "result": {
+        "categoryCount": 4,
+        "questionCount": 13,
+        "published": true
+      }
+    }
+  ]
+}

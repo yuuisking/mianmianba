@@ -1,0 +1,22 @@
+{
+  "id": "bank-jvm",
+  "name": "JVM题库",
+  "subtitle": "JVM 高频面试题库",
+  "tags": [
+    "JVM",
+    "内存",
+    "GC",
+    "类加载",
+    "调优"
+  ],
+  "updatedAt": "2026-05-09",
+  "stats": {
+    "topics": 13,
+    "paths": 4
+  },
+  "description": "覆盖内存结构、类加载、垃圾回收和性能调优，是 Java 后端面试的核心原理题库。",
+  "visibility": "public",
+  "sortOrder": 0,
+  "cover": "J",
+  "defaultTopicId": null
+}

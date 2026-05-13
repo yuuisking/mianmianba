@@ -40,10 +40,28 @@ export interface RealtimeInterruptionContext {
   interruptedAt?: string;
 }
 
+export interface InterviewExperienceInsightState {
+  stageType?: string;
+  title: string;
+  summary: string;
+  tags?: string[];
+  sourceLabel?: string | null;
+  freshnessLabel?: string | null;
+}
+
 export interface InterviewProfileState {
   launchId?: string;
+  interviewPlanId?: string;
+  interviewStageId?: string;
+  interviewRoundId?: string;
+  interviewRoomKey?: string;
+  launchFlowMode?: "stage" | "full_flow";
+  companyName?: string;
+  departmentName?: string;
+  targetRoleName?: string;
   role?: string;
   resumeSummaryMarkdown?: string;
+  jdText?: string;
   resumeImprovements?: string[];
   persona?: ParsedPersona;
   jdGapWarning?: {
@@ -56,17 +74,32 @@ export interface InterviewProfileState {
   language?: string;
   focus?: string;
   mode?: InterviewMode;
+  displayInterviewModeLabel?: string;
   topic?: string;
   desc?: string;
+  interviewTemplateId?: string;
+  interviewTemplateLabel?: string;
+  interviewIntensity?: string;
   videoEnabled?: boolean;
   limitType?: InterviewLimitType;
   questionLimit?: InterviewLimitValue;
   durationLimitMinutes?: InterviewLimitValue;
+  currentStageType?: string;
+  currentStageLabel?: string;
+  currentStageStatus?: string;
+  currentRoundStatus?: string;
+  codingRequired?: boolean;
+  codingSessionId?: string;
+  experienceInsights?: InterviewExperienceInsightState[];
   realtimeInterruptionContext?: RealtimeInterruptionContext;
 }
 
 export interface InterviewHistorySnapshot {
   sessionId?: string;
+  roomKey?: string;
+  planId?: string;
+  stageId?: string;
+  roundId?: string;
   mode: InterviewMode;
   messages: InterviewMessage[];
   elapsedTime: number;
@@ -76,7 +109,17 @@ export interface InterviewHistorySnapshot {
   questionLimit: InterviewLimitValue;
   durationLimitMinutes: InterviewLimitValue;
   launchId?: string;
+  pendingAssistantReply?: boolean;
+  thinkingStatus?: string;
 }
+
+export type InterviewRoomIdentity = {
+  planId?: string | null;
+  stageId?: string | null;
+  roundId?: string | null;
+  launchId?: string | null;
+  mode?: unknown;
+};
 
 export const QUESTION_LIMIT_OPTIONS: InterviewQuestionOption[] = [
   { label: "5 题", value: 5 },
@@ -126,6 +169,33 @@ export function createInterviewLaunchId(): string {
   }
 
   return `launch_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+/**
+ * 基于当前计划、轮次与模式生成稳定的房间身份键，用于隔离缓存与会话恢复。
+ * @param identity 当前房间的身份字段。
+ * @returns 可直接用于缓存分桶和会话绑定的房间键。
+ */
+export function buildInterviewRoomKey(identity: InterviewRoomIdentity): string {
+  const normalizedMode = normalizeInterviewMode(identity.mode);
+  const normalizeId = (value: string | null | undefined): string =>
+    typeof value === "string" && value.trim() ? value.trim() : "none";
+
+  if (normalizeId(identity.planId) !== "none") {
+    return [
+      "plan",
+      normalizeId(identity.planId),
+      normalizeId(identity.stageId),
+      normalizeId(identity.roundId),
+      normalizedMode,
+    ].join(":");
+  }
+
+  if (normalizeId(identity.launchId) !== "none") {
+    return ["launch", normalizeId(identity.launchId), normalizedMode].join(":");
+  }
+
+  return ["adhoc", normalizedMode].join(":");
 }
 
 /**
@@ -327,12 +397,33 @@ export function getRemainingQuestionCount(
  * 从浏览器会话缓存中读取当前面试画像和配置，避免各页面重复解析。
  * @returns 已归一化的画像状态；若不存在则返回 `null`。
  */
-export function readStoredInterviewProfile(): InterviewProfileState | null {
+export function getInterviewProfileStorageKey(roomKey: string): string {
+  return `parsedProfileData:${roomKey}`;
+}
+
+/**
+ * 从浏览器会话缓存中读取当前面试画像和配置，避免各页面重复解析。
+ * @param roomKey 若提供则优先读取当前房间分桶数据。
+ * @returns 已归一化的画像状态；若不存在则返回 `null`。
+ */
+export function readStoredInterviewProfile(
+  roomKey?: string | null
+): InterviewProfileState | null {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const raw = sessionStorage.getItem("parsedProfileData");
+  const candidateKeys = roomKey
+    ? [getInterviewProfileStorageKey(roomKey)]
+    : ["parsedProfileData"];
+
+  let raw: string | null = null;
+  for (const key of candidateKeys) {
+    raw = sessionStorage.getItem(key);
+    if (raw) {
+      break;
+    }
+  }
   if (!raw) {
     return null;
   }
@@ -352,14 +443,28 @@ export function readStoredInterviewProfile(): InterviewProfileState | null {
       normalizedQuestionLimit,
       normalizedDurationLimit
     );
-    return {
+    const normalizedProfile = {
       ...parsed,
       mode: normalizeInterviewMode(parsed.mode),
+      interviewRoomKey:
+        typeof parsed.interviewRoomKey === "string" && parsed.interviewRoomKey.trim()
+          ? parsed.interviewRoomKey.trim()
+          : buildInterviewRoomKey({
+              planId: parsed.interviewPlanId,
+              stageId: parsed.interviewStageId,
+              roundId: parsed.interviewRoundId,
+              launchId: parsed.launchId,
+              mode: parsed.mode,
+            }),
       limitType: resolvedLimits.limitType,
       questionLimit: resolvedLimits.questionLimit,
       durationLimitMinutes: resolvedLimits.durationLimitMinutes,
       videoEnabled: Boolean(parsed.videoEnabled)
     };
+    if (roomKey && normalizedProfile.interviewRoomKey && normalizedProfile.interviewRoomKey !== roomKey) {
+      return null;
+    }
+    return normalizedProfile;
   } catch (error) {
     console.error("Failed to read parsedProfileData", error);
     return null;
@@ -370,7 +475,10 @@ export function readStoredInterviewProfile(): InterviewProfileState | null {
  * 将最新画像和配置写回浏览器会话缓存，供后续房间页和报告页复用。
  * @param profile 需要持久化的画像状态。
  */
-export function writeStoredInterviewProfile(profile: InterviewProfileState): void {
+export function writeStoredInterviewProfile(
+  profile: InterviewProfileState,
+  roomKey?: string | null
+): void {
   if (typeof window === "undefined") {
     return;
   }
@@ -385,17 +493,28 @@ export function writeStoredInterviewProfile(profile: InterviewProfileState): voi
     normalizeInterviewLimit(profile.durationLimitMinutes)
   );
 
-  sessionStorage.setItem(
-    "parsedProfileData",
-    JSON.stringify({
-      ...profile,
-      mode: normalizeInterviewMode(profile.mode),
-      limitType: resolvedLimits.limitType,
-      questionLimit: resolvedLimits.questionLimit,
-      durationLimitMinutes: resolvedLimits.durationLimitMinutes,
-      videoEnabled: Boolean(profile.videoEnabled)
-    })
-  );
+  const resolvedRoomKey =
+    roomKey ||
+    profile.interviewRoomKey ||
+    buildInterviewRoomKey({
+      planId: profile.interviewPlanId,
+      stageId: profile.interviewStageId,
+      roundId: profile.interviewRoundId,
+      launchId: profile.launchId,
+      mode: profile.mode,
+    });
+  const serializedProfile = JSON.stringify({
+    ...profile,
+    mode: normalizeInterviewMode(profile.mode),
+    interviewRoomKey: resolvedRoomKey,
+    limitType: resolvedLimits.limitType,
+    questionLimit: resolvedLimits.questionLimit,
+    durationLimitMinutes: resolvedLimits.durationLimitMinutes,
+    videoEnabled: Boolean(profile.videoEnabled)
+  });
+  if (resolvedRoomKey) {
+    sessionStorage.setItem(getInterviewProfileStorageKey(resolvedRoomKey), serializedProfile);
+  }
 }
 
 /**
@@ -403,8 +522,8 @@ export function writeStoredInterviewProfile(profile: InterviewProfileState): voi
  * @param launchId 当前发起标识。
  * @returns 会话缓存键。
  */
-export function getActiveInterviewSessionStorageKey(launchId: string): string {
-  return `activeInterviewSession:${launchId}`;
+export function getActiveInterviewSessionStorageKey(roomKey: string): string {
+  return `activeInterviewSession:${roomKey}`;
 }
 
 /**
@@ -412,14 +531,6 @@ export function getActiveInterviewSessionStorageKey(launchId: string): string {
  * @param launchId 当前发起标识。
  * @returns 历史缓存键。
  */
-export function getInterviewHistoryStorageKey(launchId: string): string {
-  return `interviewHistory:${launchId}`;
-}
-
-/**
- * 生成报告页使用的最新历史缓存键，兼容现有报告页读取逻辑。
- * @returns 固定的最新历史缓存键。
- */
-export function getLatestInterviewHistoryStorageKey(): string {
-  return "interviewHistory";
+export function getInterviewHistoryStorageKey(roomKey: string): string {
+  return `interviewHistory:${roomKey}`;
 }

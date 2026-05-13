@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { mode, status, score } = body;
+    const { mode, status, score, planId, stageId, roundId, sourceLaunchId, roomKey } = body;
 
     const session = await prisma.interviewSession.create({
       data: {
@@ -48,6 +48,14 @@ export async function POST(req: NextRequest) {
         mode: mode || "general",
         status: status || "ongoing",
         score,
+        planId: typeof planId === "string" && planId.trim() ? planId.trim() : null,
+        stageId: typeof stageId === "string" && stageId.trim() ? stageId.trim() : null,
+        roundId: typeof roundId === "string" && roundId.trim() ? roundId.trim() : null,
+        sourceLaunchId:
+          typeof sourceLaunchId === "string" && sourceLaunchId.trim()
+            ? sourceLaunchId.trim()
+            : null,
+        roomKey: typeof roomKey === "string" && roomKey.trim() ? roomKey.trim() : null,
       },
     });
 

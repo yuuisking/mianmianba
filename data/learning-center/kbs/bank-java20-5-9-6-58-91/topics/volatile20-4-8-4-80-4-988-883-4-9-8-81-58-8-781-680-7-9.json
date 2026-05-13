@@ -1,0 +1,317 @@
+{
+  "kbId": "bank-java20-5-9-6-58-91",
+  "topicId": "volatile20-4-8-4-80-4-988-883-4-9-8-81-58-8-781-680-7-9",
+  "subjectId": "2-5-9-6-58-91-58-9-79086",
+  "updatedAt": "2026-05-09",
+  "content": {
+    "title": "volatile 为什么能保证可见性？",
+    "breadcrumb": [
+      "Java 并发题库",
+      "并发原理",
+      "volatile 为什么能保证可见性？"
+    ],
+    "quickFacts": [
+      {
+        "k": "知识点",
+        "v": "volatile 为什么能保证可见性？"
+      },
+      {
+        "k": "所属模块",
+        "v": "并发原理"
+      },
+      {
+        "k": "题库主题",
+        "v": "Java 并发"
+      },
+      {
+        "k": "难度",
+        "v": "困难"
+      },
+      {
+        "k": "面试频率",
+        "v": "高频"
+      },
+      {
+        "k": "核心关键词",
+        "v": "volatile / 可见性 / 有序性 / 内存屏障 / 原子性 / JMM"
+      }
+    ],
+    "sections": [
+      {
+        "id": "knowledge-summary",
+        "h2": "知识点总结",
+        "paragraphs": [
+          "volatile 能保证变量修改对其他线程可见，并限制相关指令重排，但不能保证 i++ 这类复合操作的原子性。",
+          "volatile 像给变量加了一个广播规则：写完要尽快让别人看到，读的时候也别只看自己的旧缓存。但它不会把多步操作变成一步，所以 i++ 仍然可能丢更新。"
+        ],
+        "bullets": [
+          "保证可见性",
+          "保证一定有序性",
+          "不保证复合操作原子性",
+          "常用于状态标记和双重检查锁定"
+        ]
+      },
+      {
+        "id": "interview-highlights",
+        "h2": "面试常问",
+        "paragraphs": [],
+        "bullets": [
+          "DCL 单例为什么需要 volatile？",
+          "volatile 和 AtomicInteger 的区别？",
+          "面试官问到「volatile 为什么能保证可见性」时，30 秒内应该先给出什么结论？",
+          "如果继续追问原理，应该补充哪些关键机制和边界条件？",
+          "在真实项目里，什么场景会用到这个知识点，怎么说明取舍？",
+          "这个问题最容易答错的误区是什么，应该如何纠正？"
+        ],
+        "callout": "面试模式下建议先给 30 秒结论，再按原理、边界、项目场景逐层展开。"
+      },
+      {
+        "id": "reference-answer",
+        "h2": "参考答案和解析",
+        "paragraphs": [
+          "volatile 保证可见性和一定的有序性，读写 volatile 变量会受到内存屏障约束。但它不保证复合操作的原子性，所以 count++ 这类操作仍然不安全。",
+          "从 JMM 角度看，线程可能把变量缓存到工作内存里，导致一个线程改了值，另一个线程不一定马上看到。volatile 写会把值刷新出去，volatile 读会重新读取较新的值，同时内存屏障会限制相关指令重排。所以它适合 running 这种状态标记。它不适合 count++，因为 i++ 包含读、加、写三步，多个线程还是会交叉执行。",
+          "高级回答可以补 DCL 单例为什么要 volatile。对象创建可能发生分配内存、初始化对象、引用赋值的重排，如果没有 volatile，其他线程可能看到一个还没初始化完成的对象引用。",
+          "30 秒回答：先说明「volatile 为什么能保证可见性？」解决什么问题，再给出最核心的机制或结论。",
+          "1 分钟回答：继续按“定义和目标 -> 原理机制 -> 典型场景 -> 边界误区”的顺序展开，让答案既完整又容易复述。",
+          "深入追问：如果面试官继续问项目经验，要补充真实场景、方案取舍、风险控制和线上排查思路。"
+        ],
+        "bullets": [
+          "可见性",
+          "有序性",
+          "不保证原子性",
+          "内存屏障"
+        ]
+      }
+    ],
+    "examPoint": "先讲线程工作内存和主内存，再讲 volatile 能保证什么、不能保证什么。",
+    "summary": "volatile 能保证变量修改对其他线程可见，并限制相关指令重排，但不能保证 i++ 这类复合操作的原子性。",
+    "scenario": "一个后台线程通过 running 标志控制另一个线程是否退出。如果 running 不是 volatile，工作线程可能一直读到旧值，导致停止信号不生效。",
+    "article": {
+      "conclusion": "volatile 能保证变量修改对其他线程可见，并限制相关指令重排，但不能保证 i++ 这类复合操作的原子性。",
+      "keyTakeaways": [
+        "保证可见性",
+        "保证一定有序性",
+        "不保证复合操作原子性",
+        "常用于状态标记和双重检查锁定"
+      ],
+      "learningGoals": [
+        "为什么 volatile 能保证可见性？",
+        "为什么 volatile 不能保证 i++ 原子性？",
+        "内存屏障解决什么问题？"
+      ],
+      "plainSummary": "volatile 像给变量加了一个广播规则：写完要尽快让别人看到，读的时候也别只看自己的旧缓存。但它不会把多步操作变成一步，所以 i++ 仍然可能丢更新。",
+      "plainRetell": "我会先说 volatile 保证可见性和一定有序性，然后解释它通过内存屏障影响读写和重排；最后强调它不保证复合操作原子性，适合状态标记，不适合并发计数。",
+      "strongSummary": "volatile 题必须同时说能保证什么和不能保证什么，尤其不能把可见性和原子性混为一谈。",
+      "sections": [
+        {
+          "id": "scenario",
+          "h2": "一、先从真实场景开始",
+          "paragraphs": [
+            "一个后台线程通过 running 标志控制另一个线程是否退出。如果 running 不是 volatile，工作线程可能一直读到旧值，导致停止信号不生效。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "先建立问题动机，再进入原理推导。"
+        },
+        {
+          "id": "why",
+          "h2": "二、核心原理为什么成立",
+          "paragraphs": [
+            "普通变量可能被线程缓存，另一个线程的修改不一定马上可见。",
+            "volatile 写会把修改刷新出去，volatile 读会重新读取较新的值。",
+            "volatile 前后会插入内存屏障，约束编译器和 CPU 的重排。",
+            "i++ 包含读、加、写三步，volatile 只能保证每次读写可见，不能保证三步整体不可被打断。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "每个结论都要解释为什么，不能停在概念层面。"
+        },
+        {
+          "id": "diagram",
+          "h2": "三、结构图解",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "diagram",
+          "highlight": "图解只承担辅助理解，不用为了有图而强行 Mermaid。",
+          "diagramCode": "线程 A 写 volatile flag=true\n└─ 刷新到主内存\n线程 B 读 volatile flag\n└─ 从主内存读取最新值",
+          "diagramType": "ascii-tree",
+          "fallbackDescription": "线程 A 写 volatile flag=true\n└─ 刷新到主内存\n线程 B 读 volatile flag\n└─ 从主内存读取最新值"
+        },
+        {
+          "id": "comparison",
+          "h2": "四、对比分析",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "comparison",
+          "highlight": "对比题必须让用户知道为什么不用另一个方案。",
+          "comparison": {
+            "title": "volatile 与锁",
+            "headers": [
+              "能力",
+              "volatile",
+              "synchronized/Lock",
+              "结论"
+            ],
+            "rows": [
+              [
+                "可见性",
+                "支持",
+                "支持",
+                "两者都能让修改被看见"
+              ],
+              [
+                "有序性",
+                "限制相关重排",
+                "临界区天然有边界",
+                "volatile 更轻量"
+              ],
+              [
+                "原子性",
+                "不支持复合操作",
+                "支持临界区互斥",
+                "计数更新不要只靠 volatile"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "code",
+          "h2": "五、代码或命令示例",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "code",
+          "highlight": "代码示例要能解释观察点，而不是只展示语法。",
+          "codeExample": {
+            "title": "volatile 停止标记示例",
+            "language": "java",
+            "code": "class Worker {\n  private volatile boolean running = true;\n  void stop() { running = false; }\n  void run() {\n    while (running) {\n      doWork();\n    }\n  }\n}",
+            "explanation": "running 作为状态标记很适合 volatile；但如果是 count++，需要 AtomicInteger 或锁。"
+          }
+        },
+        {
+          "id": "mistake",
+          "h2": "六、常见误区",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "mistake",
+          "highlight": "误区要指出为什么错，以及正确边界是什么。",
+          "mistake": {
+            "mistake": "volatile 修饰 int 后，count++ 就线程安全了。",
+            "whyWrong": "count++ 是读、加、写三步，多个线程仍可能读到同一个旧值后覆盖写回。",
+            "correct": "计数累加用 AtomicInteger、LongAdder 或锁，volatile 更适合状态标记。"
+          }
+        }
+      ]
+    },
+    "selfTests": [
+      {
+        "level": "基础",
+        "question": "为什么 volatile 能保证可见性？",
+        "hint": "先说问题本质，再说关键机制。",
+        "answer": "volatile 保证可见性和一定的有序性，读写 volatile 变量会受到内存屏障约束。但它不保证复合操作的原子性，所以 count++ 这类操作仍然不安全。",
+        "gradingCriteria": [
+          {
+            "criterion": "核心结论准确",
+            "points": 40,
+            "description": "能说出问题本质和关键机制。"
+          },
+          {
+            "criterion": "能解释为什么",
+            "points": 40,
+            "description": "不是只背名词，而是能解释设计原因。"
+          },
+          {
+            "criterion": "表达清晰",
+            "points": 20,
+            "description": "回答有结论和层次。"
+          }
+        ]
+      },
+      {
+        "level": "应用",
+        "question": "如果放到真实项目里，你会怎么判断该方案是否合适？",
+        "hint": "从场景、风险、监控和兜底四个角度想。",
+        "answer": "我会先说 volatile 保证可见性和一定有序性，然后解释它通过内存屏障影响读写和重排；最后强调它不保证复合操作原子性，适合状态标记，不适合并发计数。",
+        "gradingCriteria": [
+          {
+            "criterion": "场景匹配",
+            "points": 35,
+            "description": "能说明适用条件。"
+          },
+          {
+            "criterion": "风险意识",
+            "points": 35,
+            "description": "能指出边界和误区。"
+          },
+          {
+            "criterion": "工程表达",
+            "points": 30,
+            "description": "能落到项目验证或排查。"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "Java Platform API Specification",
+        "url": "https://docs.oracle.com/en/java/javase/",
+        "type": "官方文档",
+        "trustLevel": "S"
+      }
+    ],
+    "interviewContent": {
+      "question": "volatile 为什么能保证可见性？",
+      "questionVariants": [
+        "你能讲一下volatile 为什么能保证可见性吗？",
+        "如果面试官继续追问这个问题，你会从哪些维度展开？"
+      ],
+      "answer30s": "volatile 保证可见性和一定的有序性，读写 volatile 变量会受到内存屏障约束。但它不保证复合操作的原子性，所以 count++ 这类操作仍然不安全。",
+      "answer2min": "从 JMM 角度看，线程可能把变量缓存到工作内存里，导致一个线程改了值，另一个线程不一定马上看到。volatile 写会把值刷新出去，volatile 读会重新读取较新的值，同时内存屏障会限制相关指令重排。所以它适合 running 这种状态标记。它不适合 count++，因为 i++ 包含读、加、写三步，多个线程还是会交叉执行。",
+      "advancedAnswer": "高级回答可以补 DCL 单例为什么要 volatile。对象创建可能发生分配内存、初始化对象、引用赋值的重排，如果没有 volatile，其他线程可能看到一个还没初始化完成的对象引用。",
+      "essentialPoints": [
+        {
+          "point": "可见性"
+        },
+        {
+          "point": "有序性"
+        },
+        {
+          "point": "不保证原子性"
+        },
+        {
+          "point": "内存屏障"
+        }
+      ],
+      "bonusPoints": [
+        {
+          "point": "防止引用赋值和对象初始化重排。",
+          "why": "DCL 单例为什么需要 volatile？"
+        },
+        {
+          "point": "AtomicInteger 通过 CAS 保证更新原子性，volatile 不保证复合操作。",
+          "why": "volatile 和 AtomicInteger 的区别？"
+        }
+      ],
+      "advancedPoints": [],
+      "deductPoints": [
+        {
+          "point": "volatile 修饰 int 后，count++ 就线程安全了。",
+          "why": "count++ 是读、加、写三步，多个线程仍可能读到同一个旧值后覆盖写回。"
+        }
+      ],
+      "followUps": [
+        {
+          "question": "DCL 单例为什么需要 volatile？",
+          "difficulty": "hard",
+          "keyAnswer": "防止引用赋值和对象初始化重排。"
+        },
+        {
+          "question": "volatile 和 AtomicInteger 的区别？",
+          "difficulty": "medium",
+          "keyAnswer": "AtomicInteger 通过 CAS 保证更新原子性，volatile 不保证复合操作。"
+        }
+      ]
+    }
+  }
+}

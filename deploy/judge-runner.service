@@ -1,0 +1,17 @@
+[Unit]
+Description=Resumer Judge Runner
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/srv/resumer
+Environment=NODE_ENV=production
+Environment=JUDGE_RUNNER_HOST=127.0.0.1
+Environment=JUDGE_RUNNER_PORT=3088
+ExecStart=/usr/bin/env node /srv/resumer/scripts/judge-runner/server.mjs
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

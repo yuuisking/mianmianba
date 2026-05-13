@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>技术面试代码编辑器</title>
+<style>
+:root{
+  --bg:#1e1e1e;
+  --panel:#252526;
+  --panel-2:#2d2d30;
+  --panel-3:#1b1b1c;
+  --line:#3e3e42;
+  --text:#e7e7e7;
+  --muted:#a9a9a9;
+  --soft:#333337;
+  --orange:#c96b3e;
+  --orange-2:#422a20;
+  --green:#52c41a;
+  --red:#ff5f57;
+  --yellow:#f0c674;
+  --blue:#569cd6;
+  --purple:#c586c0;
+  --radius:8px;
+  --mono:"Fira Code","JetBrains Mono","SFMono-Regular",Consolas,monospace;
+  --ui:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  color-scheme:dark;
+}
+[data-theme="light"]{
+  --bg:#f5f6f8;
+  --panel:#ffffff;
+  --panel-2:#f7f8fa;
+  --panel-3:#fbfbfc;
+  --line:#d9dde5;
+  --text:#20242a;
+  --muted:#68717d;
+  --soft:#edf0f5;
+  --orange-2:#fff1e8;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--ui);
+  transition:background .22s ease,color .22s ease;
+}
+button,select,input{font:inherit}
+button{cursor:pointer}
+.app{
+  height:100dvh;
+  display:grid;
+  grid-template-rows:56px minmax(0,1fr) 48px;
+}
+.topbar,.bottombar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:8px 12px;
+  background:var(--panel);
+  border-bottom:1px solid var(--line);
+}
+.bottombar{border-top:1px solid var(--line);border-bottom:0;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;min-width:max-content}
+.brand-mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#e98b5c,var(--orange));display:grid;place-items:center;color:#fff}
+.toolbar-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.spacer{flex:1}
+.select,.tool-btn,.num-input{
+  height:34px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--panel-2);
+  color:var(--text);
+  padding:0 10px;
+  outline:none;
+}
+.num-input{width:70px}
+.tool-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:800}
+.tool-btn:hover,.select:hover{border-color:var(--orange)}
+.run{background:var(--green);border-color:var(--green);color:#071b08}
+.submit{background:var(--orange);border-color:var(--orange);color:#fff}
+.danger{color:#ffb2aa}
+.main{
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(260px,26%) 8px minmax(520px,1fr) 8px minmax(260px,22%);
+  background:var(--bg);
+}
+.pane{min-width:0;min-height:0;background:var(--panel);overflow:auto}
+.resizer{background:var(--bg);position:relative;cursor:col-resize}
+.resizer:after{content:"";position:absolute;top:10px;bottom:10px;left:3px;width:2px;border-radius:999px;background:var(--line)}
+.question,.assistant{padding:16px}
+.panel-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+h1,h2,h3,p{margin-top:0}
+h1{font-size:1.35rem;margin-bottom:8px}
+h2{font-size:1rem;margin-bottom:10px}
+h3{font-size:.95rem;margin-bottom:8px}
+.tag{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-size:.75rem;font-weight:900;border:1px solid var(--line)}
+.easy{color:#5ee277;background:rgba(82,196,26,.1);border-color:rgba(82,196,26,.3)}
+.orange{color:#ffad82;background:var(--orange-2);border-color:rgba(201,107,62,.45)}
+.muted{color:var(--muted);line-height:1.65}
+.md{line-height:1.72;color:var(--text)}
+.code-block,.terminal{
+  font-family:var(--mono);
+  background:var(--panel-3);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:12px;
+  overflow:auto;
+}
+.code-block{font-size:.86rem;color:#d8dee9}
+.constraint{padding-left:18px;color:var(--muted);line-height:1.8}
+.center{
+  min-width:0;
+  min-height:0;
+  display:grid;
+  grid-template-rows:40px minmax(0,1fr) auto;
+  background:var(--panel);
+  border-left:1px solid var(--line);
+  border-right:1px solid var(--line);
+}
+.file-tabs{display:flex;align-items:flex-end;background:var(--panel-2);border-bottom:1px solid var(--line);overflow:auto}
+.file-tab{
+  height:40px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 14px;
+  border-right:1px solid var(--line);
+  color:var(--muted);
+  font-family:var(--mono);
+  font-size:.84rem;
+}
+.file-tab.active{background:var(--panel);color:var(--text);box-shadow:inset 0 2px 0 var(--orange)}
+.editor-wrap{position:relative;min-height:0;overflow:hidden;background:var(--panel)}
+.loading{
+  position:absolute;
+  inset:0;
+  z-index:4;
+  display:grid;
+  place-items:center;
+  background:var(--panel);
+  transition:opacity .25s ease,visibility .25s ease;
+}
+.loading.hide{opacity:0;visibility:hidden}
+.spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--orange);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.editor{
+  height:100%;
+  display:grid;
+  grid-template-columns:54px minmax(0,1fr);
+  font-family:var(--mono);
+  font-size:14px;
+  line-height:1.6;
+}
+.gutter{
+  background:var(--panel-3);
+  border-right:1px solid var(--line);
+  color:#858585;
+  text-align:right;
+  padding:12px 10px;
+  user-select:none;
+  overflow:hidden;
+}
+.gutter div{height:1.6em}
+.code-area{
+  position:relative;
+  min-width:0;
+  overflow:auto;
+}
+.code-highlights,.code-input{
+  margin:0;
+  min-height:100%;
+  padding:12px 14px;
+  font:inherit;
+  line-height:inherit;
+  white-space:pre;
+  tab-size:4;
+}
+.code-highlights{pointer-events:none;color:var(--text)}
+.code-input{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  border:0;
+  outline:0;
+  resize:none;
+  background:transparent;
+  color:transparent;
+  caret-color:var(--text);
+  overflow:hidden;
+}
+.kw{color:var(--purple)}.type{color:#4ec9b0}.str{color:#ce9178}.num{color:#b5cea8}.com{color:#6a9955}.fn{color:#dcdcaa}.warn{text-decoration:underline wavy var(--yellow)}.err{text-decoration:underline wavy var(--red)}
+.fold{color:#858585;margin-right:6px}
+.suggest{
+  position:absolute;
+  left:190px;
+  top:78px;
+  width:230px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--panel-2);
+  box-shadow:0 18px 50px rgba(0,0,0,.25);
+  overflow:hidden;
+  display:none;
+  z-index:3;
+}
+.suggest.show{display:block}
+.suggest div{display:flex;justify-content:space-between;padding:8px 10px;font-family:var(--mono);font-size:.82rem}
+.suggest div:first-child{background:rgba(201,107,62,.22)}
+.result-panel{
+  max-height:280px;
+  border-top:1px solid var(--line);
+  background:var(--panel-2);
+  overflow:hidden;
+  transition:max-height .25s ease;
+}
+.result-panel.collapsed{max-height:38px}
+.result-head{height:38px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--line)}
+.result-body{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;overflow:auto}
+.terminal{min-height:150px;background:#0b0f14;color:#d9f7be}
+.terminal .error{color:#ff7875}
+.metrics{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.case{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:10px;margin-bottom:8px}
+.case-head{display:flex;justify-content:space-between;font-weight:900;margin-bottom:8px}
+.pass{color:var(--green)}.fail{color:var(--red)}
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:var(--mono);font-size:.8rem}
+.diff div{border-radius:6px;padding:8px;background:var(--panel-3);border:1px solid var(--line)}
+.assistant-card{border:1px solid var(--line);border-radius:8px;background:var(--panel-2);padding:12px;margin-bottom:12px}
+.timer{font-family:var(--mono);font-size:1.6rem;font-weight:900;color:var(--orange)}
+.progress-line{height:7px;border-radius:999px;background:var(--soft);overflow:hidden}.progress-line i{display:block;height:100%;width:40%;background:var(--orange)}
+.message{display:flex;gap:10px;margin:10px 0}.avatar{width:30px;height:30px;border-radius:50%;background:var(--orange);color:#fff;display:grid;place-items:center;font-weight:900;flex:0 0 auto}.bubble{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:10px;line-height:1.55;color:var(--muted)}
+.toast{
+  position:fixed;
+  right:18px;
+  top:72px;
+  z-index:20;
+  display:grid;
+  gap:8px;
+}
+.toast-item{border:1px solid var(--line);background:var(--panel);color:var(--text);border-left:4px solid var(--green);border-radius:8px;padding:11px 14px;box-shadow:0 16px 40px rgba(0,0,0,.24);animation:toastIn .18s ease}
+.toast-item.error{border-left-color:var(--red)}
+@keyframes toastIn{from{transform:translateY(-8px);opacity:0}}
+.mobile-tabs{display:none}
+.settings-pop{
+  position:absolute;
+  right:12px;
+  top:50px;
+  width:240px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:var(--panel);
+  padding:12px;
+  box-shadow:0 18px 50px rgba(0,0,0,.28);
+  display:none;
+  z-index:10;
+}
+.settings-pop.show{display:block}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0;color:var(--muted)}
+@media (max-width:1100px){
+  .main{grid-template-columns:minmax(260px,34%) 8px minmax(0,1fr)}
+  .assistant,.right-resizer{display:none}
+  .result-body{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .app{grid-template-rows:auto minmax(0,1fr) auto}
+  .topbar,.bottombar{flex-wrap:wrap}
+  .mobile-tabs{display:flex;gap:6px;width:100%;padding:8px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .mobile-tabs button{flex:1;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--text);font-weight:800}
+  .mobile-tabs button.active{border-color:var(--orange);color:#ffad82}
+  .main{display:block;overflow:hidden}
+  .pane,.center{display:none;height:100%}
+  .pane.mobile-active,.center.mobile-active{display:grid}
+  .question.mobile-active,.assistant.mobile-active{display:block}
+  .resizer{display:none}
+  .center{grid-template-rows:40px minmax(0,1fr) auto}
+}
+</style>
+</head>
+<body data-theme="dark">
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">A</span><span>面试代码间</span></div>
+    <div class="toolbar-group">
+      <select class="select" id="language">
+        <option>Java</option><option>Python</option><option>Go</option><option>C++</option><option>JavaScript</option><option>TypeScript</option><option>SQL</option>
+      </select>
+      <button class="tool-btn" id="themeBtn">暗色</button>
+      <label class="muted">字号 <input class="num-input" id="fontSize" type="number" min="12" max="18" value="14"></label>
+      <button class="tool-btn" id="settingsBtn">设置</button>
+    </div>
+    <div class="spacer"></div>
+    <span class="tag orange">第 2 题 / 共 5 题</span>
+    <div class="settings-pop" id="settingsPop">
+      <div class="setting-row"><span>保存时格式化</span><input type="checkbox" checked></div>
+      <div class="setting-row"><span>自动保存</span><input type="checkbox" checked></div>
+      <div class="setting-row"><span>Tab 宽度</span><select class="select"><option>2</option><option selected>4</option><option>8</option></select></div>
+    </div>
+  </header>
+
+  <div class="mobile-tabs">
+    <button class="active" data-mobile="questionPane">题目</button>
+    <button data-mobile="editorPane">代码</button>
+    <button data-mobile="assistantPane">辅助</button>
+  </div>
+
+  <main class="main" id="layout">
+    <aside class="pane question mobile-active" id="questionPane">
+      <div class="panel-title"><h1>两数之和</h1><span class="tag easy">简单</span></div>
+      <p class="muted">给定一个整数数组 <b>nums</b> 和一个整数目标值 <b>target</b>，请你在该数组中找出和为目标值的两个整数，并返回它们的数组下标。</p>
+      <h2>题目描述</h2>
+      <div class="md">
+        你可以假设每种输入只会对应一个答案。但是，数组中同一个元素在答案里不能重复出现。你可以按任意顺序返回答案。
+      </div>
+      <h2>示例 1</h2>
+      <pre class="code-block">输入：nums = [2,7,11,15], target = 9
+输出：[0,1]
+解释：因为 nums[0] + nums[1] == 9</pre>
+      <h2>示例 2</h2>
+      <pre class="code-block">输入：nums = [3,2,4], target = 6
+输出：[1,2]</pre>
+      <h2>约束条件</h2>
+      <ul class="constraint">
+        <li>2 &lt;= nums.length &lt;= 10<sup>4</sup></li>
+        <li>-10<sup>9</sup> &lt;= nums[i] &lt;= 10<sup>9</sup></li>
+        <li>只会存在一个有效答案</li>
+      </ul>
+    </aside>
+
+    <div class="resizer" data-resize="left"></div>
+
+    <section class="center mobile-active" id="editorPane">
+      <div class="file-tabs" id="fileTabs">
+        <div class="file-tab active" data-file="solution">Solution.java</div>
+        <div class="file-tab" data-file="test">Test.java</div>
+      </div>
+      <div class="editor-wrap">
+        <div class="loading" id="loading"><div class="spinner" aria-label="加载中"></div></div>
+        <div class="editor" id="editor">
+          <div class="gutter" id="gutter"></div>
+          <div class="code-area" id="codeArea">
+            <pre class="code-highlights" id="highlight"></pre>
+            <textarea class="code-input" id="codeInput" spellcheck="false"></textarea>
+            <div class="suggest" id="suggest">
+              <div><span>HashMap&lt;Integer,Integer&gt;</span><b>class</b></div>
+              <div><span>containsKey()</span><b>method</b></div>
+              <div><span>return new int[]</span><b>snippet</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <section class="result-panel" id="resultPanel">
+        <div class="result-head"><b>运行结果</b><button class="tool-btn" id="collapseResult">收起</button></div>
+        <div class="result-body">
+          <div>
+            <div class="metrics"><span class="tag">耗时 24ms</span><span class="tag">内存 42.3MB</span><span class="tag easy">2 / 3 通过</span></div>
+            <pre class="terminal" id="terminal">等待运行代码...</pre>
+          </div>
+          <div id="caseList"></div>
+        </div>
+      </section>
+    </section>
+
+    <div class="resizer right-resizer" data-resize="right"></div>
+
+    <aside class="pane assistant" id="assistantPane">
+      <div class="assistant-card">
+        <h2>面试计时</h2>
+        <div class="timer" id="timer">18:36</div>
+        <p class="muted">建议本题控制在 20 分钟内完成。</p>
+      </div>
+      <div class="assistant-card">
+        <h2>当前进度</h2>
+        <p class="muted">第 2 题 / 共 5 题</p>
+        <div class="progress-line"><i></i></div>
+      </div>
+      <div class="assistant-card">
+        <h2>面试官提示</h2>
+        <div class="message"><div class="avatar">AI</div><div class="bubble">先说思路，再写代码。注意说明为什么 HashMap 可以把时间复杂度降到 O(n)。</div></div>
+        <div class="message"><div class="avatar">AI</div><div class="bubble">追问准备：如果数组中存在重复元素，你的实现是否仍然正确？</div></div>
+      </div>
+      <div class="assistant-card">
+        <h2>Review 关注点</h2>
+        <p class="muted">边界条件、复杂度、变量命名、能否一次遍历解决。</p>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="bottombar">
+    <div class="toolbar-group">
+      <button class="tool-btn run" id="runBtn">▶ 运行</button>
+      <button class="tool-btn submit" id="submitBtn">提交</button>
+      <button class="tool-btn danger" id="resetBtn">重置代码</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="tool-btn" id="suggestBtn">自动补全</button>
+      <button class="tool-btn" id="fullBtn">全屏</button>
+    </div>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const files={
+  solution:`import java.util.*;
+
+class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        Map<Integer, Integer> map = new HashMap<>();
+        for (int i = 0; i < nums.length; i++) {
+            int need = target - nums[i];
+            if (map.containsKey(need)) {
+                return new int[]{map.get(need), i};
+            }
+            map.put(nums[i], i);
+        }
+        return new int[]{};
+    }
+}`,
+  test:`import java.util.Arrays;
+
+class Test {
+    public static void main(String[] args) {
+        Solution s = new Solution();
+        System.out.println(Arrays.toString(
+            s.twoSum(new int[]{2,7,11,15}, 9)
+        ));
+    }
+}`
+};
+
+const tests=[
+  {name:"示例 1",input:"nums=[2,7,11,15], target=9",expected:"[0,1]",actual:"[0,1]",pass:true},
+  {name:"示例 2",input:"nums=[3,2,4], target=6",expected:"[1,2]",actual:"[1,2]",pass:true},
+  {name:"重复元素",input:"nums=[3,3], target=6",expected:"[0,1]",actual:"[]",pass:false}
+];
+
+let activeFile="solution";
+let seconds=18*60+36;
+const codeInput=document.getElementById("codeInput");
+const highlight=document.getElementById("highlight");
+const gutter=document.getElementById("gutter");
+const suggest=document.getElementById("suggest");
+
+function escapeHtml(str){
+  return str.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+function highlightJava(code){
+  let html=escapeHtml(code);
+  html=html.replace(/(\/\/.*)/g,'<span class="com">$1</span>');
+  html=html.replace(/(".*?")/g,'<span class="str">$1</span>');
+  html=html.replace(/\b(class|public|private|static|return|new|for|if|else|import)\b/g,'<span class="kw">$1</span>');
+  html=html.replace(/\b(int|void|boolean|String|Map|Integer|HashMap)\b/g,'<span class="type">$1</span>');
+  html=html.replace(/\b(\d+)\b/g,'<span class="num">$1</span>');
+  html=html.replace(/\b(twoSum|containsKey|put|get|main|println)\b/g,'<span class="fn">$1</span>');
+  html=html.replace(/return new int\[\]\{\};/g,'<span class="warn">return new int[]{};</span>');
+  return html;
+}
+
+function renderEditor(){
+  const code=files[activeFile];
+  codeInput.value=code;
+  highlight.innerHTML=highlightJava(code);
+  const lines=code.split("\n").length;
+  gutter.innerHTML=Array.from({length:lines},(_,i)=>`<div><span class="fold">${i===3?"▾":""}</span>${i+1}</div>`).join("");
+}
+
+function syncCode(){
+  files[activeFile]=codeInput.value;
+  highlight.innerHTML=highlightJava(codeInput.value);
+  const lines=codeInput.value.split("\n").length;
+  gutter.innerHTML=Array.from({length:lines},(_,i)=>`<div>${i+1}</div>`).join("");
+}
+
+function renderCases(){
+  document.getElementById("caseList").innerHTML=tests.map(t=>`
+    <div class="case">
+      <div class="case-head"><span>${t.name}</span><span class="${t.pass?"pass":"fail"}">${t.pass?"通过":"失败"}</span></div>
+      <p class="muted">输入：${t.input}</p>
+      ${t.pass?`<p class="muted">输出：${t.actual}</p>`:`
+      <div class="diff">
+        <div><b>Expected</b><br>${t.expected}</div>
+        <div><b>Actual</b><br><span class="fail">${t.actual}</span></div>
+      </div>`}
+    </div>
+  `).join("");
+}
+
+function toast(message,type="success"){
+  const box=document.createElement("div");
+  box.className=`toast-item ${type==="error"?"error":""}`;
+  box.textContent=message;
+  document.getElementById("toast").appendChild(box);
+  setTimeout(()=>box.remove(),2600);
+}
+
+function setRunLoading(on){
+  const btn=document.getElementById("runBtn");
+  btn.disabled=on;
+  btn.textContent=on?"运行中...":"▶ 运行";
+}
+
+document.getElementById("runBtn").onclick=()=>{
+  setRunLoading(true);
+  document.getElementById("resultPanel").classList.remove("collapsed");
+  document.getElementById("terminal").textContent="Compiling Solution.java...\nRunning 3 test cases...";
+  setTimeout(()=>{
+    setRunLoading(false);
+    document.getElementById("terminal").innerHTML=`<span>Compile success.</span>
+<span>stdout: [0, 1]</span>
+<span class="error">case 3 failed: expected [0,1], but got []</span>`;
+    renderCases();
+    toast("运行完成：2 / 3 个测试用例通过","error");
+  },900);
+};
+
+document.getElementById("submitBtn").onclick=()=>{
+  toast("提交成功，AI 面试官正在生成追问");
+};
+
+document.getElementById("resetBtn").onclick=()=>{
+  files.solution=`class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        // write your code here
+        return new int[]{};
+    }
+}`;
+  activeFile="solution";
+  document.querySelectorAll(".file-tab").forEach(t=>t.classList.toggle("active",t.dataset.file==="solution"));
+  renderEditor();
+  toast("代码已重置");
+};
+
+document.getElementById("collapseResult").onclick=()=>{
+  const panel=document.getElementById("resultPanel");
+  panel.classList.toggle("collapsed");
+  document.getElementById("collapseResult").textContent=panel.classList.contains("collapsed")?"展开":"收起";
+};
+
+document.getElementById("themeBtn").onclick=()=>{
+  const body=document.body;
+  const light=body.dataset.theme==="light";
+  body.dataset.theme=light?"dark":"light";
+  document.getElementById("themeBtn").textContent=light?"暗色":"亮色";
+};
+
+document.getElementById("fontSize").oninput=e=>{
+  const size=Math.max(12,Math.min(18,Number(e.target.value)||14));
+  document.getElementById("editor").style.fontSize=size+"px";
+};
+
+document.getElementById("settingsBtn").onclick=()=>{
+  document.getElementById("settingsPop").classList.toggle("show");
+};
+
+document.getElementById("suggestBtn").onclick=()=>{
+  suggest.classList.toggle("show");
+};
+
+document.getElementById("fullBtn").onclick=()=>{
+  document.documentElement.requestFullscreen?.();
+};
+
+document.querySelectorAll(".file-tab").forEach(tab=>{
+  tab.onclick=()=>{
+    activeFile=tab.dataset.file;
+    document.querySelectorAll(".file-tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    renderEditor();
+  };
+});
+
+codeInput.addEventListener("input",syncCode);
+codeInput.addEventListener("keydown",e=>{
+  if(e.key==="Tab"){
+    e.preventDefault();
+    const start=codeInput.selectionStart;
+    codeInput.value=codeInput.value.slice(0,start)+"    "+codeInput.value.slice(codeInput.selectionEnd);
+    codeInput.selectionStart=codeInput.selectionEnd=start+4;
+    syncCode();
+  }
+});
+
+document.querySelectorAll(".mobile-tabs button").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll(".mobile-tabs button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll("#questionPane,#editorPane,#assistantPane").forEach(p=>p.classList.remove("mobile-active"));
+    document.getElementById(btn.dataset.mobile).classList.add("mobile-active");
+  };
+});
+
+setInterval(()=>{
+  seconds++;
+  const m=String(Math.floor(seconds/60)).padStart(2,"0");
+  const s=String(seconds%60).padStart(2,"0");
+  document.getElementById("timer").textContent=`${m}:${s}`;
+},1000);
+
+setTimeout(()=>document.getElementById("loading").classList.add("hide"),650);
+renderEditor();
+renderCases();
+</script>
+</body>
+</html>

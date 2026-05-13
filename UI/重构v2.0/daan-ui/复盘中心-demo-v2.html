@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>答岸 AI｜复盘中心 Demo V2</title>
+  <style>
+    :root{
+      --bg:#f6f1ea;
+      --bg-grid:rgba(231,111,76,.06);
+      --card:#fffdfa;
+      --card-strong:#ffffff;
+      --text:#201d1a;
+      --muted:#82786e;
+      --line:#e8ddd0;
+      --line-soft:#f3ebe2;
+      --orange:#e76f4c;
+      --orange-deep:#cc5a38;
+      --orange-soft:#fff2ea;
+      --blue:#3f86e8;
+      --blue-soft:#eef5ff;
+      --green:#5f9b58;
+      --green-soft:#eff8ef;
+      --purple:#7b55d6;
+      --purple-soft:#f5efff;
+      --shadow:0 24px 50px rgba(71, 51, 31, .08);
+      --shadow-soft:0 14px 28px rgba(71, 51, 31, .05);
+      --radius-xl:28px;
+      --radius-lg:22px;
+      --radius-md:16px;
+      --radius-sm:12px;
+      --max:1520px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      min-height:100vh;
+      color:var(--text);
+      font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,.92), transparent 32%),
+        radial-gradient(circle at right 14% top 10%, rgba(231,111,76,.10), transparent 22%),
+        linear-gradient(180deg, #fbf8f4 0%, var(--bg) 100%);
+    }
+
+    body:before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background-image:
+        linear-gradient(var(--bg-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+      background-size:28px 28px;
+      mask-image:linear-gradient(180deg, rgba(0,0,0,.18), transparent 72%);
+      opacity:.45;
+    }
+
+    a{text-decoration:none;color:inherit}
+    button{font:inherit;cursor:pointer}
+
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      backdrop-filter:blur(18px);
+      background:rgba(251,247,241,.82);
+      border-bottom:1px solid rgba(232,221,208,.75);
+    }
+
+    .topbar-inner{
+      max-width:var(--max);
+      height:72px;
+      margin:0 auto;
+      padding:0 24px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      min-width:max-content;
+    }
+
+    .logo{
+      width:42px;
+      height:42px;
+      border-radius:14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:24px;
+      font-weight:900;
+      background:linear-gradient(180deg,#ff976a,#e85f39);
+      box-shadow:0 14px 26px rgba(231,111,76,.25);
+    }
+
+    .brand-copy{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+
+    .brand-copy b{
+      font-size:21px;
+      letter-spacing:-.4px;
+    }
+
+    .brand-copy span{
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
+    }
+
+    .nav{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex:1;
+      justify-content:center;
+      min-width:0;
+    }
+
+    .nav span{
+      padding:10px 16px;
+      border-radius:999px;
+      font-weight:800;
+      color:#6a635d;
+      white-space:nowrap;
+    }
+
+    .nav .active{
+      color:var(--orange);
+      background:var(--orange-soft);
+      box-shadow:inset 0 0 0 1px rgba(231,111,76,.12);
+    }
+
+    .topbar-right{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-width:max-content;
+    }
+
+    .chip{
+      height:36px;
+      padding:0 14px;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:800;
+      border:1px solid transparent;
+    }
+
+    .chip.orange{
+      color:var(--orange);
+      background:var(--orange-soft);
+    }
+
+    .chip.white{
+      background:rgba(255,255,255,.75);
+      border-color:rgba(232,221,208,.8);
+      color:#594f46;
+    }
+
+    .avatar{
+      width:40px;
+      height:40px;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:linear-gradient(180deg,#f3eee7,#ebe3da);
+      border:1px solid rgba(221,214,205,.9);
+      font-weight:900;
+    }
+
+    .page{
+      max-width:var(--max);
+      margin:0 auto;
+      padding:20px 24px 44px;
+      position:relative;
+    }
+
+    .hero{
+      position:relative;
+      overflow:hidden;
+      min-height:176px;
+      display:grid;
+      grid-template-columns:minmax(0, 1.2fr) minmax(340px, .8fr);
+      gap:24px;
+      align-items:center;
+      padding:30px 34px;
+      border-radius:var(--radius-xl);
+      border:1px solid rgba(232,221,208,.85);
+      background:
+        radial-gradient(circle at right 18% top 28%, rgba(255,195,170,.34), transparent 24%),
+        linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,249,244,.98));
+      box-shadow:var(--shadow);
+    }
+
+    .hero:after{
+      content:"";
+      position:absolute;
+      right:-42px;
+      top:-34px;
+      width:240px;
+      height:240px;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(231,111,76,.16), transparent 70%);
+      pointer-events:none;
+    }
+
+    .eyebrow{
+      width:max-content;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.88);
+      border:1px solid rgba(232,221,208,.9);
+      color:#7a7168;
+      font-weight:800;
+      margin-bottom:12px;
+    }
+
+    .hero h1{
+      margin:0;
+      font-size:38px;
+      line-height:1.08;
+      letter-spacing:-1.2px;
+    }
+
+    .hero p{
+      margin:14px 0 0;
+      max-width:720px;
+      color:#655c54;
+      font-size:16px;
+    }
+
+    .hero-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      margin-top:18px;
+    }
+
+    .hero-btn{
+      height:42px;
+      padding:0 18px;
+      border:none;
+      border-radius:12px;
+      font-weight:900;
+    }
+
+    .hero-btn.primary{
+      color:#fff;
+      background:linear-gradient(180deg, #f0845d, #e26945);
+      box-shadow:0 14px 24px rgba(231,111,76,.22);
+    }
+
+    .hero-btn.secondary{
+      color:#5e554d;
+      background:rgba(255,255,255,.84);
+      border:1px solid rgba(232,221,208,.92);
+    }
+
+    .hero-side{
+      position:relative;
+      display:flex;
+      justify-content:flex-end;
+      align-items:center;
+      min-height:116px;
+    }
+
+    .hero-visual{
+      width:100%;
+      max-width:420px;
+      display:grid;
+      grid-template-columns:1.1fr .9fr;
+      gap:14px;
+      align-items:end;
+    }
+
+    .hero-stat,
+    .hero-surface{
+      border-radius:22px;
+      border:1px solid rgba(232,221,208,.9);
+      background:rgba(255,255,255,.88);
+      box-shadow:var(--shadow-soft);
+    }
+
+    .hero-stat{
+      padding:18px;
+      transform:rotate(-4deg);
+    }
+
+    .hero-stat b{
+      display:block;
+      font-size:30px;
+      letter-spacing:-1px;
+      margin-bottom:6px;
+    }
+
+    .hero-stat span{
+      color:var(--muted);
+      font-weight:800;
+    }
+
+    .hero-bars{
+      margin-top:14px;
+      display:flex;
+      align-items:flex-end;
+      gap:8px;
+      height:72px;
+    }
+
+    .hero-bars i{
+      width:12px;
+      border-radius:999px;
+      background:linear-gradient(180deg,#f5b39c,#e76f4c);
+    }
+
+    .hero-surface{
+      min-height:154px;
+      padding:18px 18px 16px;
+      transform:rotate(4deg);
+    }
+
+    .hero-surface__row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:14px;
+    }
+
+    .hero-surface__row strong{
+      font-size:14px;
+    }
+
+    .hero-surface__row span{
+      color:var(--blue);
+      font-weight:900;
+      font-size:12px;
+    }
+
+    .hero-ring{
+      width:88px;
+      height:88px;
+      margin:4px auto 12px;
+      border-radius:50%;
+      background:conic-gradient(var(--purple) 0 67%, rgba(123,85,214,.14) 67% 100%);
+      position:relative;
+    }
+
+    .hero-ring:after{
+      content:"";
+      position:absolute;
+      inset:14px;
+      border-radius:50%;
+      background:#fff;
+    }
+
+    .hero-list{
+      display:grid;
+      gap:8px;
+    }
+
+    .hero-list div{
+      height:10px;
+      border-radius:999px;
+      background:#efe6dd;
+    }
+
+    .kpi-grid{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:16px;
+      margin-top:18px;
+    }
+
+    .kpi{
+      min-height:128px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      padding:22px 24px;
+      border-radius:var(--radius-lg);
+      border:1px solid rgba(232,221,208,.92);
+      background:rgba(255,253,250,.92);
+      box-shadow:var(--shadow-soft);
+    }
+
+    .kpi-main{
+      display:flex;
+      align-items:center;
+      gap:16px;
+      min-width:0;
+    }
+
+    .ico{
+      width:54px;
+      height:54px;
+      border-radius:16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:24px;
+      font-weight:900;
+      box-shadow:0 14px 24px rgba(0,0,0,.09);
+      flex:none;
+    }
+
+    .ico.orange{background:linear-gradient(180deg,#ff845e,#e86944)}
+    .ico.blue{background:linear-gradient(180deg,#5c9ff1,#3578d9)}
+    .ico.green{background:linear-gradient(180deg,#70ad64,#4f934a)}
+    .ico.purple{background:linear-gradient(180deg,#9b6ff0,#734ccf)}
+
+    .kpi-title{
+      color:#5a534d;
+      font-weight:800;
+      margin-bottom:6px;
+    }
+
+    .kpi-value{
+      font-size:30px;
+      line-height:1;
+      letter-spacing:-.8px;
+      font-weight:900;
+    }
+
+    .kpi-value small{
+      font-size:15px;
+      font-weight:700;
+      color:#5a534d;
+    }
+
+    .kpi-sub{
+      margin-top:8px;
+      color:#80776f;
+      font-size:13px;
+      font-weight:700;
+    }
+
+    .up{color:#4f964f}
+
+    .mini-chart{
+      width:94px;
+      height:64px;
+      display:flex;
+      align-items:flex-end;
+      gap:8px;
+      flex:none;
+    }
+
+    .mini-chart i{
+      width:8px;
+      border-radius:999px;
+      background:linear-gradient(180deg,#f4baa6,#ef855f);
+    }
+
+    .spark{
+      width:122px;
+      height:58px;
+      flex:none;
+    }
+
+    .ring{
+      width:78px;
+      height:78px;
+      border-radius:50%;
+      background:conic-gradient(var(--purple) 0 62%, rgba(123,85,214,.16) 62% 100%);
+      position:relative;
+      flex:none;
+    }
+
+    .ring:after{
+      content:"";
+      position:absolute;
+      inset:13px;
+      border-radius:50%;
+      background:#fff;
+    }
+
+    .twin-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+      margin-top:16px;
+    }
+
+    .panel,
+    .history-panel{
+      border-radius:var(--radius-lg);
+      border:1px solid rgba(232,221,208,.92);
+      background:rgba(255,253,250,.92);
+      box-shadow:var(--shadow-soft);
+    }
+
+    .panel{
+      padding:18px;
+      min-width:0;
+    }
+
+    .panel-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+      margin-bottom:14px;
+    }
+
+    .panel h2,
+    .history-panel h2{
+      margin:0;
+      font-size:20px;
+      letter-spacing:-.25px;
+    }
+
+    .panel-more{
+      color:#938980;
+      font-size:13px;
+      font-weight:800;
+      white-space:nowrap;
+    }
+
+    .plan-list{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    .plan-card{
+      min-height:88px;
+      display:grid;
+      grid-template-columns:56px minmax(0, 1fr) auto;
+      align-items:center;
+      gap:16px;
+      padding:14px 16px;
+      border-radius:16px;
+      border:1px solid var(--line-soft);
+      background:rgba(255,255,255,.84);
+    }
+
+    .plan-card.orange{
+      background:linear-gradient(90deg, rgba(255,242,234,.95), rgba(255,255,255,.94));
+      border-color:#f2d5c8;
+    }
+
+    .plan-card.blue{
+      background:linear-gradient(90deg, rgba(239,246,255,.96), rgba(255,255,255,.94));
+      border-color:#d6e6fb;
+    }
+
+    .plan-card.green{
+      background:linear-gradient(90deg, rgba(240,248,239,.96), rgba(255,255,255,.94));
+      border-color:#dbead7;
+    }
+
+    .num{
+      width:48px;
+      height:48px;
+      border-radius:14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:24px;
+      font-weight:900;
+      letter-spacing:-1px;
+    }
+
+    .orange .num{background:#fff0ea;color:var(--orange)}
+    .blue .num{background:#eaf4ff;color:var(--blue)}
+    .green .num{background:#eaf8e8;color:var(--green)}
+
+    .plan-title{
+      display:flex;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-bottom:5px;
+      font-weight:900;
+      font-size:18px;
+      letter-spacing:-.2px;
+    }
+
+    .tag{
+      height:22px;
+      padding:0 8px;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:12px;
+      font-weight:900;
+    }
+
+    .tag.orange{color:var(--orange);background:var(--orange-soft)}
+    .tag.blue{color:var(--blue);background:var(--blue-soft)}
+    .tag.green{color:var(--green);background:var(--green-soft)}
+
+    .plan-desc{
+      color:#7a726a;
+      font-size:13px;
+      line-height:1.55;
+    }
+
+    .plan-time{
+      margin-top:6px;
+      color:#938b83;
+      font-size:12px;
+      font-weight:700;
+    }
+
+    .weak-meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:22px;
+      margin-top:7px;
+      color:#7b746c;
+      font-size:13px;
+    }
+
+    .weak-meta b{
+      color:#1f2329;
+    }
+
+    .start-btn,
+    .full-button,
+    .center-more{
+      height:40px;
+      border-radius:12px;
+      font-weight:900;
+      border:none;
+    }
+
+    .start-btn{
+      min-width:104px;
+      padding:0 18px;
+      color:#fff;
+      box-shadow:0 10px 18px rgba(0,0,0,.06);
+    }
+
+    .start-btn.orange{background:var(--orange)}
+    .start-btn.blue{background:var(--blue)}
+    .start-btn.green{background:var(--green)}
+
+    .full-button,
+    .center-more{
+      background:rgba(255,255,255,.72);
+      border:1px solid rgba(232,221,208,.92);
+      color:var(--blue);
+    }
+
+    .history-panel{
+      margin-top:16px;
+      padding:18px;
+    }
+
+    .history-panel__top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:14px;
+    }
+
+    .history-panel__top span{
+      color:#8d847b;
+      font-size:13px;
+      font-weight:800;
+    }
+
+    .history-scroll{
+      overflow:auto;
+      border-radius:16px;
+      border:1px solid rgba(232,221,208,.9);
+      background:#fff;
+    }
+
+    table{
+      width:100%;
+      min-width:980px;
+      border-collapse:collapse;
+      table-layout:fixed;
+    }
+
+    th,td{
+      padding:14px 16px;
+      border-bottom:1px solid rgba(241,236,229,.95);
+      text-align:left;
+      color:#3c3834;
+      font-size:14px;
+    }
+
+    th{
+      background:#fcfaf7;
+      color:#8d857d;
+      font-weight:800;
+      font-size:13px;
+    }
+
+    tr:last-child td{border-bottom:none}
+
+    .type-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size:13px;
+      font-weight:800;
+    }
+
+    .tiny-icon{
+      width:22px;
+      height:22px;
+      border-radius:7px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:12px;
+    }
+
+    .tiny-icon.orange{background:var(--orange)}
+    .tiny-icon.blue{background:var(--blue)}
+    .detail{
+      color:var(--orange);
+      font-weight:900;
+    }
+
+    .demo-note{
+      margin-top:16px;
+      padding:14px 16px;
+      border-radius:16px;
+      border:1px dashed rgba(231,111,76,.3);
+      background:rgba(255,243,236,.8);
+      color:#7b5849;
+      font-weight:700;
+    }
+
+    @media (max-width: 1200px){
+      .nav{display:none}
+      .hero{
+        grid-template-columns:1fr;
+        padding:26px;
+      }
+      .hero-side{justify-content:flex-start}
+      .kpi-grid{grid-template-columns:repeat(2, minmax(0, 1fr))}
+      .twin-grid{grid-template-columns:1fr}
+    }
+
+    @media (max-width: 760px){
+      .topbar-inner,
+      .page{padding-left:14px;padding-right:14px}
+      .topbar-right .chip.white{display:none}
+      .hero h1{font-size:30px}
+      .hero-visual{grid-template-columns:1fr}
+      .kpi-grid{grid-template-columns:1fr}
+      .plan-card{grid-template-columns:48px 1fr}
+      .start-btn{grid-column:1 / -1}
+      .history-panel__top{flex-direction:column;align-items:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo">A</div>
+        <div class="brand-copy">
+          <b>答岸 AI</b>
+          <span>Review Center Demo</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <span>首页</span>
+        <span>发起面试</span>
+        <span>专项训练</span>
+        <span>学习中心</span>
+        <span class="active">复盘中心</span>
+        <span>会员管理</span>
+        <span>学习后台</span>
+      </nav>
+      <div class="topbar-right">
+        <span class="chip orange">免费版</span>
+        <span class="chip white">7 日内已完成 7 次训练</span>
+        <div class="avatar">AD</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">答岸 AI · 复盘中心 Demo</div>
+        <h1>全面回看训练表现，把薄弱维度、补强计划和训练记录放到一张清晰的大盘里。</h1>
+        <p>这个 demo 先只验证整体视觉方向，不替换真实页面逻辑。重点是把复盘中心做得更稳重、更清晰、更有“训练驾驶舱”的感觉。</p>
+        <div class="hero-actions">
+          <button class="hero-btn primary">查看完整复盘流</button>
+          <button class="hero-btn secondary">回到现有版本对照</button>
+        </div>
+      </div>
+
+      <div class="hero-side">
+        <div class="hero-visual">
+          <div class="hero-stat">
+            <b>78 分</b>
+            <span>最近 14 天平均得分</span>
+            <div class="hero-bars">
+              <i style="height:20px"></i>
+              <i style="height:30px"></i>
+              <i style="height:44px"></i>
+              <i style="height:60px"></i>
+              <i style="height:70px"></i>
+            </div>
+          </div>
+          <div class="hero-surface">
+            <div class="hero-surface__row">
+              <strong>复训完成度</strong>
+              <span>62%</span>
+            </div>
+            <div class="hero-ring"></div>
+            <div class="hero-list">
+              <div></div>
+              <div style="width:82%"></div>
+              <div style="width:68%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="kpi-grid">
+      <article class="kpi">
+        <div class="kpi-main">
+          <div class="ico orange">💬</div>
+          <div>
+            <div class="kpi-title">本周训练次数</div>
+            <div class="kpi-value">7 <small>次</small></div>
+            <div class="kpi-sub">较上周 <span class="up">↑ 40%</span></div>
+          </div>
+        </div>
+        <div class="mini-chart">
+          <i style="height:18px;opacity:.18"></i>
+          <i style="height:30px;opacity:.28"></i>
+          <i style="height:42px;opacity:.45"></i>
+          <i style="height:54px;opacity:.75"></i>
+          <i style="height:68px"></i>
+        </div>
+      </article>
+
+      <article class="kpi">
+        <div class="kpi-main">
+          <div class="ico blue">◎</div>
+          <div>
+            <div class="kpi-title">平均得分</div>
+            <div class="kpi-value">78 <small>分</small></div>
+            <div class="kpi-sub">较上周 <span class="up">↑ 6 分</span></div>
+          </div>
+        </div>
+        <svg class="spark" viewBox="0 0 120 56" fill="none">
+          <path d="M4 44 L24 18 L42 25 L58 20 L74 27 L92 14 L116 24" stroke="#3477D8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="24" cy="18" r="3" fill="#3477D8"/>
+          <circle cx="58" cy="20" r="3" fill="#3477D8"/>
+          <circle cx="92" cy="14" r="3" fill="#3477D8"/>
+        </svg>
+      </article>
+
+      <article class="kpi">
+        <div class="kpi-main">
+          <div class="ico green">♟</div>
+          <div>
+            <div class="kpi-title">当前薄弱维度</div>
+            <div class="kpi-value" style="font-size:21px">结构化表达（STAR）</div>
+            <div class="kpi-sub">近 3 次得分均低于团队均值 12 分</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="kpi">
+        <div class="kpi-main">
+          <div class="ico purple">◔</div>
+          <div>
+            <div class="kpi-title">7 日复训率</div>
+            <div class="kpi-value">62<small>%</small></div>
+            <div class="kpi-sub">较上周 <span class="up">↑ 15%</span></div>
+          </div>
+        </div>
+        <div class="ring"></div>
+      </article>
+    </section>
+
+    <section class="twin-grid">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>高频薄弱维度 ⓘ</h2>
+          <span class="panel-more">基于最近 20 次训练</span>
+        </div>
+        <div class="plan-list">
+          <article class="plan-card orange">
+            <div class="num">01</div>
+            <div>
+              <div class="plan-title">结构化表达（STAR）<span class="tag orange">高频</span></div>
+              <div class="plan-desc">在问题拆解、逻辑组织与结论呈现上存在不足，影响表达清晰度与说服力。</div>
+              <div class="weak-meta"><span>出现次数 <b>23 次</b></span><span>最新得分 <b>62 分</b></span></div>
+            </div>
+            <button class="start-btn orange">专项突破</button>
+          </article>
+
+          <article class="plan-card blue">
+            <div class="num">02</div>
+            <div>
+              <div class="plan-title">证据充分性（量化指标）<span class="tag blue">高频</span></div>
+              <div class="plan-desc">案例中量化指标、对比数据不足，成果展示不够有力，导致说服力弱。</div>
+              <div class="weak-meta"><span>出现次数 <b>18 次</b></span><span>最新得分 <b>65 分</b></span></div>
+            </div>
+            <button class="start-btn blue">专项突破</button>
+          </article>
+
+          <article class="plan-card green">
+            <div class="num">03</div>
+            <div>
+              <div class="plan-title">技术深度与原理<span class="tag green">高频</span></div>
+              <div class="plan-desc">对核心原理和底层机制的阐述深度不足，建议更明确体现技术判断力。</div>
+              <div class="weak-meta"><span>出现次数 <b>16 次</b></span><span>最新得分 <b>66 分</b></span></div>
+            </div>
+            <button class="start-btn green">专项突破</button>
+          </article>
+
+          <button class="full-button">查看全部薄弱维度 →</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>推荐补强计划</h2>
+          <span class="panel-more">根据薄弱维度自动生成</span>
+        </div>
+        <div class="plan-list">
+          <article class="plan-card orange">
+            <div class="num">01</div>
+            <div>
+              <div class="plan-title">结构化表达专项突破计划 <span class="tag orange">优先</span></div>
+              <div class="plan-desc">掌握 STAR 框架应用，提升逻辑组织与结论表达能力。</div>
+              <div class="plan-time">预计耗时：3 小时</div>
+            </div>
+            <button class="start-btn orange">开始计划</button>
+          </article>
+
+          <article class="plan-card blue">
+            <div class="num">02</div>
+            <div>
+              <div class="plan-title">证据充分性提升计划</div>
+              <div class="plan-desc">学习如何用量化指标与对比数据增强说服力，让案例更扎实。</div>
+              <div class="plan-time">预计耗时：2.5 小时</div>
+            </div>
+            <button class="start-btn blue">开始计划</button>
+          </article>
+
+          <article class="plan-card green">
+            <div class="num">03</div>
+            <div>
+              <div class="plan-title">技术深度强化计划</div>
+              <div class="plan-desc">深入理解关键原理与底层机制，把“会做”讲到“为什么这样做”。</div>
+              <div class="plan-time">预计耗时：4 小时</div>
+            </div>
+            <button class="start-btn green">开始计划</button>
+          </article>
+
+          <button class="full-button">查看全部计划 →</button>
+        </div>
+      </section>
+    </section>
+
+    <section class="history-panel">
+      <div class="history-panel__top">
+        <h2>历史训练记录</h2>
+        <span>把模拟面试与专项训练统一沉淀在一张清晰表里</span>
+      </div>
+
+      <div class="history-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:18%">训练时间</th>
+              <th style="width:14%">训练类型</th>
+              <th style="width:24%">方向</th>
+              <th style="width:10%">得分</th>
+              <th style="width:24%">薄弱维度</th>
+              <th style="width:10%">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2026/05/08 14:32</td>
+              <td><span class="type-pill"><span class="tiny-icon orange">💬</span>模拟面试</span></td>
+              <td>Java 开发工程师 · 高级</td>
+              <td>82 分</td>
+              <td>证据充分性（量化指标）</td>
+              <td><a class="detail" href="#">查看详情</a></td>
+            </tr>
+            <tr>
+              <td>2026/05/07 20:15</td>
+              <td><span class="type-pill"><span class="tiny-icon blue">◎</span>专项训练</span></td>
+              <td>并发编程与线程安全</td>
+              <td>68 分</td>
+              <td>结构化表达（STAR）</td>
+              <td><a class="detail" href="#">查看详情</a></td>
+            </tr>
+            <tr>
+              <td>2026/05/07 10:09</td>
+              <td><span class="type-pill"><span class="tiny-icon orange">💬</span>模拟面试</span></td>
+              <td>Java 开发工程师 · 高级</td>
+              <td>76 分</td>
+              <td>技术深度与原理</td>
+              <td><a class="detail" href="#">查看详情</a></td>
+            </tr>
+            <tr>
+              <td>2026/05/06 19:48</td>
+              <td><span class="type-pill"><span class="tiny-icon blue">◎</span>专项训练</span></td>
+              <td>JVM 内存模型与 GC</td>
+              <td>71 分</td>
+              <td>证据充分性（量化指标）</td>
+              <td><a class="detail" href="#">查看详情</a></td>
+            </tr>
+            <tr>
+              <td>2026/05/06 09:21</td>
+              <td><span class="type-pill"><span class="tiny-icon orange">💬</span>模拟面试</span></td>
+              <td>后端开发工程师</td>
+              <td>65 分</td>
+              <td>结构化表达（STAR）</td>
+              <td><a class="detail" href="#">查看详情</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:12px">
+        <div class="center-more">查看全部记录 →</div>
+      </div>
+    </section>
+
+    <section class="demo-note">
+      当前文件仅用于样式确认：如果你认可这个方向，我下一步再把它拆进真实的 `review` 页面组件与样式系统。
+    </section>
+  </main>
+</body>
+</html>

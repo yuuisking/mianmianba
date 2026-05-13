@@ -1,0 +1,323 @@
+{
+  "kbId": "bank-jvm",
+  "topicId": "7-1-58-0-8-8-87-7-88-5928-58-8-4-2-5-794-6-4-69-588-6-698-4-80-4-988-9",
+  "subjectId": "2-7-1-58-0-8-4-88-689-7-8-18",
+  "updatedAt": "2026-05-09",
+  "content": {
+    "title": "类加载过程和双亲委派机制是什么？",
+    "breadcrumb": [
+      "JVM题库",
+      "类加载与执行",
+      "类加载过程和双亲委派机制是什么？"
+    ],
+    "quickFacts": [
+      {
+        "k": "知识点",
+        "v": "类加载过程和双亲委派机制是什么？"
+      },
+      {
+        "k": "所属模块",
+        "v": "类加载与执行"
+      },
+      {
+        "k": "题库主题",
+        "v": "JVM"
+      },
+      {
+        "k": "难度",
+        "v": "困难"
+      },
+      {
+        "k": "面试频率",
+        "v": "高频"
+      },
+      {
+        "k": "核心关键词",
+        "v": "加载 / 验证 / 准备 / 解析 / 初始化 / 双亲委派 / ClassLoader"
+      }
+    ],
+    "sections": [
+      {
+        "id": "knowledge-summary",
+        "h2": "知识点总结",
+        "paragraphs": [
+          "类加载过程通常包括加载、验证、准备、解析、初始化；双亲委派则是类加载器先把加载请求交给父加载器，父加载不了才自己加载。",
+          "类加载可以理解成 JVM 把 .class 文件办成可执行身份。先找到字节码，再检查合法性，准备静态变量空间，解析符号引用，最后真正执行初始化逻辑。"
+        ],
+        "bullets": [
+          "加载得到二进制字节流并生成 Class 对象",
+          "验证保证字节码安全",
+          "准备给静态变量分配默认值",
+          "初始化执行静态赋值和静态代码块"
+        ]
+      },
+      {
+        "id": "interview-highlights",
+        "h2": "面试常问",
+        "paragraphs": [],
+        "bullets": [
+          "为什么 Tomcat 要打破双亲委派？",
+          "ClassNotFoundException 和 NoClassDefFoundError 有什么区别？",
+          "面试官问到「类加载过程和双亲委派机制是什么」时，30 秒内应该先给出什么结论？",
+          "如果继续追问原理，应该补充哪些关键机制和边界条件？",
+          "在真实项目里，什么场景会用到这个知识点，怎么说明取舍？",
+          "这个问题最容易答错的误区是什么，应该如何纠正？"
+        ],
+        "callout": "面试模式下建议先给 30 秒结论，再按原理、边界、项目场景逐层展开。"
+      },
+      {
+        "id": "reference-answer",
+        "h2": "参考答案和解析",
+        "paragraphs": [
+          "类加载通常包括加载、验证、准备、解析、初始化。双亲委派是加载请求先交给父加载器，父加载不了再自己加载，主要为了保护核心类和避免重复加载。",
+          "加载阶段获取 class 字节流并生成 Class 对象；验证保证字节码合法；准备给静态变量分配内存并设默认值；解析把符号引用转成直接引用；初始化执行静态赋值和静态代码块。双亲委派让请求先向父加载器传递，比如核心 JDK 类优先由 Bootstrap 加载，避免应用自己写一个 java.lang.String 替换核心类。",
+          "高级回答可以补破坏双亲委派的场景，如 SPI、Tomcat 多应用隔离、热部署和插件化。破坏不是随便破坏，而是为了隔离或反向加载扩展实现。",
+          "30 秒回答：先说明「类加载过程和双亲委派机制是什么？」解决什么问题，再给出最核心的机制或结论。",
+          "1 分钟回答：继续按“定义和目标 -> 原理机制 -> 典型场景 -> 边界误区”的顺序展开，让答案既完整又容易复述。",
+          "深入追问：如果面试官继续问项目经验，要补充真实场景、方案取舍、风险控制和线上排查思路。"
+        ],
+        "bullets": [
+          "五阶段",
+          "准备与初始化区别",
+          "双亲委派流程",
+          "双亲委派原因"
+        ]
+      }
+    ],
+    "examPoint": "先讲 class 文件如何变成 Class 对象，再讲双亲委派为什么保护核心类和避免重复加载。",
+    "summary": "类加载过程通常包括加载、验证、准备、解析、初始化；双亲委派则是类加载器先把加载请求交给父加载器，父加载不了才自己加载。",
+    "scenario": "项目里遇到 ClassNotFoundException、NoClassDefFoundError、SPI 扩展不生效、热部署类冲突时，背后经常都和类加载器边界有关。",
+    "article": {
+      "conclusion": "类加载过程通常包括加载、验证、准备、解析、初始化；双亲委派则是类加载器先把加载请求交给父加载器，父加载不了才自己加载。",
+      "keyTakeaways": [
+        "加载得到二进制字节流并生成 Class 对象",
+        "验证保证字节码安全",
+        "准备给静态变量分配默认值",
+        "初始化执行静态赋值和静态代码块"
+      ],
+      "learningGoals": [
+        "类加载五个阶段分别做什么？",
+        "准备和初始化有什么区别？",
+        "为什么需要双亲委派？"
+      ],
+      "plainSummary": "类加载可以理解成 JVM 把 .class 文件办成可执行身份。先找到字节码，再检查合法性，准备静态变量空间，解析符号引用，最后真正执行初始化逻辑。",
+      "plainRetell": "我会先讲加载、验证、准备、解析、初始化五阶段，再强调准备是默认值，初始化才执行静态赋值。双亲委派是先交给父加载器，保护核心类并避免重复加载。",
+      "strongSummary": "类加载题要把阶段顺序、准备/初始化区别、双亲委派原因和破坏委派的场景讲完整。",
+      "sections": [
+        {
+          "id": "scenario",
+          "h2": "一、先从真实场景开始",
+          "paragraphs": [
+            "项目里遇到 ClassNotFoundException、NoClassDefFoundError、SPI 扩展不生效、热部署类冲突时，背后经常都和类加载器边界有关。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "先建立问题动机，再进入原理推导。"
+        },
+        {
+          "id": "why",
+          "h2": "二、核心原理为什么成立",
+          "paragraphs": [
+            "加载阶段通过类名找到字节码来源，可以来自文件、网络、jar 包或动态生成。",
+            "验证阶段防止非法字节码破坏 JVM 安全。",
+            "准备阶段给静态变量分配内存并设默认值，真正的显式赋值通常在初始化阶段。",
+            "双亲委派避免核心类被应用自定义类替换，也减少同一个类被重复加载的风险。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "每个结论都要解释为什么，不能停在概念层面。"
+        },
+        {
+          "id": "diagram",
+          "h2": "三、结构图解",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "diagram",
+          "highlight": "图解只承担辅助理解，不用为了有图而强行 Mermaid。",
+          "diagramCode": "ClassLoader 加载流程\n├─ BootstrapClassLoader\n├─ PlatformClassLoader\n├─ AppClassLoader\n└─ CustomClassLoader\n请求先向上委派，父加载不了再向下尝试",
+          "diagramType": "ascii-tree",
+          "fallbackDescription": "ClassLoader 加载流程\n├─ BootstrapClassLoader\n├─ PlatformClassLoader\n├─ AppClassLoader\n└─ CustomClassLoader\n请求先向上委派，父加载不了再向下尝试"
+        },
+        {
+          "id": "comparison",
+          "h2": "四、对比分析",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "comparison",
+          "highlight": "对比题必须让用户知道为什么不用另一个方案。",
+          "comparison": {
+            "title": "类加载阶段",
+            "headers": [
+              "阶段",
+              "做什么",
+              "容易混淆点",
+              "面试关键词"
+            ],
+            "rows": [
+              [
+                "加载",
+                "获取字节流并生成 Class 对象",
+                "不是执行静态代码",
+                "ClassLoader"
+              ],
+              [
+                "验证",
+                "校验字节码安全",
+                "不是业务校验",
+                "安全性"
+              ],
+              [
+                "准备",
+                "静态变量默认值",
+                "不是显式赋值",
+                "static 默认值"
+              ],
+              [
+                "初始化",
+                "执行 clinit",
+                "静态赋值和静态块",
+                "主动使用触发"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "code",
+          "h2": "五、代码或命令示例",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "code",
+          "highlight": "代码示例要能解释观察点，而不是只展示语法。",
+          "codeExample": {
+            "title": "准备与初始化的区别",
+            "language": "java",
+            "code": "class Demo {\n  static int count = 10;\n  static {\n    count = 20;\n  }\n}",
+            "explanation": "准备阶段 count 先是默认值 0；初始化阶段才执行显式赋值和静态代码块，最终变成 20。"
+          }
+        },
+        {
+          "id": "mistake",
+          "h2": "六、常见误区",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "mistake",
+          "highlight": "误区要指出为什么错，以及正确边界是什么。",
+          "mistake": {
+            "mistake": "准备阶段会把 static int count = 10 设置成 10。",
+            "whyWrong": "准备阶段通常只分配内存并设置默认零值，显式赋值在初始化阶段执行。",
+            "correct": "准备阶段 count 是 0，初始化阶段执行赋值和静态代码块。"
+          }
+        }
+      ]
+    },
+    "selfTests": [
+      {
+        "level": "基础",
+        "question": "类加载五个阶段分别做什么？",
+        "hint": "先说问题本质，再说关键机制。",
+        "answer": "类加载通常包括加载、验证、准备、解析、初始化。双亲委派是加载请求先交给父加载器，父加载不了再自己加载，主要为了保护核心类和避免重复加载。",
+        "gradingCriteria": [
+          {
+            "criterion": "核心结论准确",
+            "points": 40,
+            "description": "能说出问题本质和关键机制。"
+          },
+          {
+            "criterion": "能解释为什么",
+            "points": 40,
+            "description": "不是只背名词，而是能解释设计原因。"
+          },
+          {
+            "criterion": "表达清晰",
+            "points": 20,
+            "description": "回答有结论和层次。"
+          }
+        ]
+      },
+      {
+        "level": "应用",
+        "question": "如果放到真实项目里，你会怎么判断该方案是否合适？",
+        "hint": "从场景、风险、监控和兜底四个角度想。",
+        "answer": "我会先讲加载、验证、准备、解析、初始化五阶段，再强调准备是默认值，初始化才执行静态赋值。双亲委派是先交给父加载器，保护核心类并避免重复加载。",
+        "gradingCriteria": [
+          {
+            "criterion": "场景匹配",
+            "points": 35,
+            "description": "能说明适用条件。"
+          },
+          {
+            "criterion": "风险意识",
+            "points": 35,
+            "description": "能指出边界和误区。"
+          },
+          {
+            "criterion": "工程表达",
+            "points": 30,
+            "description": "能落到项目验证或排查。"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "The Java Virtual Machine Specification",
+        "url": "https://docs.oracle.com/javase/specs/",
+        "type": "官方规范",
+        "trustLevel": "S"
+      }
+    ],
+    "interviewContent": {
+      "question": "类加载过程和双亲委派机制是什么？",
+      "questionVariants": [
+        "你能讲一下类加载过程和双亲委派机制是什么吗？",
+        "如果面试官继续追问这个问题，你会从哪些维度展开？"
+      ],
+      "answer30s": "类加载通常包括加载、验证、准备、解析、初始化。双亲委派是加载请求先交给父加载器，父加载不了再自己加载，主要为了保护核心类和避免重复加载。",
+      "answer2min": "加载阶段获取 class 字节流并生成 Class 对象；验证保证字节码合法；准备给静态变量分配内存并设默认值；解析把符号引用转成直接引用；初始化执行静态赋值和静态代码块。双亲委派让请求先向父加载器传递，比如核心 JDK 类优先由 Bootstrap 加载，避免应用自己写一个 java.lang.String 替换核心类。",
+      "advancedAnswer": "高级回答可以补破坏双亲委派的场景，如 SPI、Tomcat 多应用隔离、热部署和插件化。破坏不是随便破坏，而是为了隔离或反向加载扩展实现。",
+      "essentialPoints": [
+        {
+          "point": "五阶段"
+        },
+        {
+          "point": "准备与初始化区别"
+        },
+        {
+          "point": "双亲委派流程"
+        },
+        {
+          "point": "双亲委派原因"
+        }
+      ],
+      "bonusPoints": [
+        {
+          "point": "为了不同 Web 应用之间类隔离，同名类可以各自加载。",
+          "why": "为什么 Tomcat 要打破双亲委派？"
+        },
+        {
+          "point": "前者是加载时找不到，后者常见于曾经能找到但运行期解析或初始化失败。",
+          "why": "ClassNotFoundException 和 NoClassDefFoundError 有什么区别？"
+        }
+      ],
+      "advancedPoints": [],
+      "deductPoints": [
+        {
+          "point": "准备阶段会把 static int count = 10 设置成 10。",
+          "why": "准备阶段通常只分配内存并设置默认零值，显式赋值在初始化阶段执行。"
+        }
+      ],
+      "followUps": [
+        {
+          "question": "为什么 Tomcat 要打破双亲委派？",
+          "difficulty": "hard",
+          "keyAnswer": "为了不同 Web 应用之间类隔离，同名类可以各自加载。"
+        },
+        {
+          "question": "ClassNotFoundException 和 NoClassDefFoundError 有什么区别？",
+          "difficulty": "medium",
+          "keyAnswer": "前者是加载时找不到，后者常见于曾经能找到但运行期解析或初始化失败。"
+        }
+      ]
+    }
+  }
+}

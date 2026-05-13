@@ -1,0 +1,321 @@
+{
+  "kbId": "bank-java20-5-9-6-58-91",
+  "topicId": "java20-58685-5-98-6-8-1-59-8-20jmm20-8-7-3-586-3-4-86-4-80-4-988-997-9-298-9",
+  "subjectId": "2-5-9-6-58-91-58-9-79086",
+  "updatedAt": "2026-05-09",
+  "content": {
+    "title": "Java 内存模型 JMM 解决了什么问题？",
+    "breadcrumb": [
+      "Java 并发题库",
+      "并发原理",
+      "Java 内存模型 JMM 解决了什么问题？"
+    ],
+    "quickFacts": [
+      {
+        "k": "知识点",
+        "v": "Java 内存模型 JMM 解决了什么问题？"
+      },
+      {
+        "k": "所属模块",
+        "v": "并发原理"
+      },
+      {
+        "k": "题库主题",
+        "v": "Java 并发"
+      },
+      {
+        "k": "难度",
+        "v": "困难"
+      },
+      {
+        "k": "面试频率",
+        "v": "高频"
+      },
+      {
+        "k": "核心关键词",
+        "v": "JMM / 可见性 / 原子性 / 有序性 / happens-before / 内存屏障"
+      }
+    ],
+    "sections": [
+      {
+        "id": "knowledge-summary",
+        "h2": "知识点总结",
+        "paragraphs": [
+          "Java 内存模型 JMM 解决的是多线程下可见性、原子性和有序性的规则问题，它规定线程之间什么时候必须看见彼此的写入。",
+          "JMM 可以理解成多线程读写共享变量的交通规则。没有规则时，一个线程改了值，另一个线程可能看不到；代码顺序看着没变，底层执行也可能被重排。"
+        ],
+        "bullets": [
+          "JMM 是规范不是具体内存区域",
+          "核心问题是可见性、原子性、有序性",
+          "happens-before 描述可见性保证",
+          "volatile、锁、线程启动和 join 都会建立规则"
+        ]
+      },
+      {
+        "id": "interview-highlights",
+        "h2": "面试常问",
+        "paragraphs": [],
+        "bullets": [
+          "JMM 和 JVM 运行时内存区域有什么区别？",
+          "volatile 为什么不能替代锁？",
+          "面试官问到「Java 内存模型 JMM 解决了什么问题」时，30 秒内应该先给出什么结论？",
+          "如果继续追问原理，应该补充哪些关键机制和边界条件？",
+          "在真实项目里，什么场景会用到这个知识点，怎么说明取舍？",
+          "这个问题最容易答错的误区是什么，应该如何纠正？"
+        ],
+        "callout": "面试模式下建议先给 30 秒结论，再按原理、边界、项目场景逐层展开。"
+      },
+      {
+        "id": "reference-answer",
+        "h2": "参考答案和解析",
+        "paragraphs": [
+          "JMM 是 Java 对多线程读写共享变量的规范，核心解决可见性、原子性和有序性。它通过 happens-before 等规则说明哪些写入必须对后续读取可见，volatile、锁、start/join 都会建立这种关系。",
+          "JMM 不是堆栈方法区，而是并发语义规则。多线程下，线程可能缓存变量，CPU 和编译器也可能重排指令，所以一个线程写入的数据，另一个线程不一定按代码顺序看到。JMM 用 happens-before 规则定义可见性边界，比如 volatile 写 happens-before 后续 volatile 读，unlock happens-before 后续 lock，线程 start 之前的操作对子线程可见，join 之后能看到子线程结果。",
+          "高级回答可以补 volatile 与锁的边界。volatile 适合发布状态和禁止特定重排，但不保证复合操作原子性；锁既保证可见性，也通过互斥保护临界区复合状态。Atomic 类则常用 CAS 完成单变量原子更新。",
+          "30 秒回答：先说明「Java 内存模型 JMM 解决了什么问题？」解决什么问题，再给出最核心的机制或结论。",
+          "1 分钟回答：继续按“定义和目标 -> 原理机制 -> 典型场景 -> 边界误区”的顺序展开，让答案既完整又容易复述。",
+          "深入追问：如果面试官继续问项目经验，要补充真实场景、方案取舍、风险控制和线上排查思路。"
+        ],
+        "bullets": [
+          "JMM 是并发语义规范",
+          "可见性、原子性、有序性",
+          "happens-before",
+          "volatile 与锁的边界"
+        ]
+      }
+    ],
+    "examPoint": "先讲多线程为什么会看见旧值和乱序，再用 JMM 的三类问题和 happens-before 规则收束。",
+    "summary": "Java 内存模型 JMM 解决的是多线程下可见性、原子性和有序性的规则问题，它规定线程之间什么时候必须看见彼此的写入。",
+    "scenario": "一个线程把 initialized 设为 true，另一个线程看到 true 后读取配置对象。如果没有正确的可见性和有序性保证，第二个线程可能看到半初始化的数据。",
+    "article": {
+      "conclusion": "Java 内存模型 JMM 解决的是多线程下可见性、原子性和有序性的规则问题，它规定线程之间什么时候必须看见彼此的写入。",
+      "keyTakeaways": [
+        "JMM 是规范不是具体内存区域",
+        "核心问题是可见性、原子性、有序性",
+        "happens-before 描述可见性保证",
+        "volatile、锁、线程启动和 join 都会建立规则"
+      ],
+      "learningGoals": [
+        "JMM 和 JVM 运行时内存区域有什么区别？",
+        "happens-before 解决什么问题？",
+        "volatile 和 synchronized 在 JMM 里分别提供什么保证？"
+      ],
+      "plainSummary": "JMM 可以理解成多线程读写共享变量的交通规则。没有规则时，一个线程改了值，另一个线程可能看不到；代码顺序看着没变，底层执行也可能被重排。",
+      "plainRetell": "我会先说 JMM 解决多线程共享变量的可见性、原子性、有序性问题，然后解释 happens-before 是判断写入是否必须对后续读取可见的规则，最后对比 volatile、锁和 Atomic 类分别适合什么场景。",
+      "strongSummary": "JMM 题的关键是把它讲成并发语义规范，而不是 JVM 内存区域；再用 happens-before 解释可见性边界。",
+      "sections": [
+        {
+          "id": "scenario",
+          "h2": "一、先从真实场景开始",
+          "paragraphs": [
+            "一个线程把 initialized 设为 true，另一个线程看到 true 后读取配置对象。如果没有正确的可见性和有序性保证，第二个线程可能看到半初始化的数据。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "先建立问题动机，再进入原理推导。"
+        },
+        {
+          "id": "why",
+          "h2": "二、核心原理为什么成立",
+          "paragraphs": [
+            "线程可能把共享变量缓存到本地，导致其他线程的写入不能立刻可见。",
+            "编译器和 CPU 可能在不改变单线程语义的前提下重排指令，但多线程下会暴露风险。",
+            "happens-before 规则定义了哪些操作的结果必须对后续操作可见。",
+            "volatile 写读、锁释放获取、线程 start/join 等都会建立明确的可见性边界。"
+          ],
+          "bullets": [],
+          "type": "text",
+          "highlight": "每个结论都要解释为什么，不能停在概念层面。"
+        },
+        {
+          "id": "diagram",
+          "h2": "三、结构图解",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "diagram",
+          "highlight": "图解只承担辅助理解，不用为了有图而强行 Mermaid。",
+          "diagramCode": "共享变量写入\n├─ 没有同步：可能不可见/可能重排\n└─ 建立 happens-before\n   ├─ volatile 写 -> volatile 读\n   ├─ unlock -> lock\n   └─ thread.start/join",
+          "diagramType": "ascii-tree",
+          "fallbackDescription": "共享变量写入\n├─ 没有同步：可能不可见/可能重排\n└─ 建立 happens-before\n   ├─ volatile 写 -> volatile 读\n   ├─ unlock -> lock\n   └─ thread.start/join"
+        },
+        {
+          "id": "comparison",
+          "h2": "四、对比分析",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "comparison",
+          "highlight": "对比题必须让用户知道为什么不用另一个方案。",
+          "comparison": {
+            "title": "JMM 常见保证",
+            "headers": [
+              "机制",
+              "可见性",
+              "有序性",
+              "原子性",
+              "适合场景"
+            ],
+            "rows": [
+              [
+                "volatile",
+                "支持",
+                "限制相关重排",
+                "单次读写",
+                "状态标记、DCL"
+              ],
+              [
+                "synchronized/Lock",
+                "支持",
+                "临界区边界",
+                "临界区互斥",
+                "复合状态更新"
+              ],
+              [
+                "Atomic 类",
+                "支持",
+                "依赖 volatile/CAS 语义",
+                "单变量原子更新",
+                "计数器、引用替换"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "code",
+          "h2": "五、代码或命令示例",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "code",
+          "highlight": "代码示例要能解释观察点，而不是只展示语法。",
+          "codeExample": {
+            "title": "用 volatile 建立发布可见性",
+            "language": "java",
+            "code": "class ConfigHolder {\n  private Config config;\n  private volatile boolean ready;\n\n  void init() {\n    config = loadConfig();\n    ready = true;\n  }\n\n  Config get() {\n    return ready ? config : null;\n  }\n}",
+            "explanation": "ready 的 volatile 写和读建立可见性关系，让读线程看到 ready=true 时，也能看到之前写入的 config 引用。"
+          }
+        },
+        {
+          "id": "mistake",
+          "h2": "六、常见误区",
+          "paragraphs": [],
+          "bullets": [],
+          "type": "mistake",
+          "highlight": "误区要指出为什么错，以及正确边界是什么。",
+          "mistake": {
+            "mistake": "JMM 就是 JVM 的堆、栈、方法区这些运行时内存区域。",
+            "whyWrong": "运行时内存区域描述 JVM 如何组织内存；JMM 描述多线程读写共享变量的可见性和重排规则。",
+            "correct": "两者要分开：JVM 内存区域偏存储结构，JMM 偏并发语义规范。"
+          }
+        }
+      ]
+    },
+    "selfTests": [
+      {
+        "level": "基础",
+        "question": "JMM 和 JVM 运行时内存区域有什么区别？",
+        "hint": "先说问题本质，再说关键机制。",
+        "answer": "JMM 是 Java 对多线程读写共享变量的规范，核心解决可见性、原子性和有序性。它通过 happens-before 等规则说明哪些写入必须对后续读取可见，volatile、锁、start/join 都会建立这种关系。",
+        "gradingCriteria": [
+          {
+            "criterion": "核心结论准确",
+            "points": 40,
+            "description": "能说出问题本质和关键机制。"
+          },
+          {
+            "criterion": "能解释为什么",
+            "points": 40,
+            "description": "不是只背名词，而是能解释设计原因。"
+          },
+          {
+            "criterion": "表达清晰",
+            "points": 20,
+            "description": "回答有结论和层次。"
+          }
+        ]
+      },
+      {
+        "level": "应用",
+        "question": "如果放到真实项目里，你会怎么判断该方案是否合适？",
+        "hint": "从场景、风险、监控和兜底四个角度想。",
+        "answer": "我会先说 JMM 解决多线程共享变量的可见性、原子性、有序性问题，然后解释 happens-before 是判断写入是否必须对后续读取可见的规则，最后对比 volatile、锁和 Atomic 类分别适合什么场景。",
+        "gradingCriteria": [
+          {
+            "criterion": "场景匹配",
+            "points": 35,
+            "description": "能说明适用条件。"
+          },
+          {
+            "criterion": "风险意识",
+            "points": 35,
+            "description": "能指出边界和误区。"
+          },
+          {
+            "criterion": "工程表达",
+            "points": 30,
+            "description": "能落到项目验证或排查。"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "title": "Java Platform API Specification",
+        "url": "https://docs.oracle.com/en/java/javase/",
+        "type": "官方文档",
+        "trustLevel": "S"
+      }
+    ],
+    "interviewContent": {
+      "question": "Java 内存模型 JMM 解决了什么问题？",
+      "questionVariants": [
+        "你能讲一下Java 内存模型 JMM 解决了什么问题吗？",
+        "如果面试官继续追问这个问题，你会从哪些维度展开？"
+      ],
+      "answer30s": "JMM 是 Java 对多线程读写共享变量的规范，核心解决可见性、原子性和有序性。它通过 happens-before 等规则说明哪些写入必须对后续读取可见，volatile、锁、start/join 都会建立这种关系。",
+      "answer2min": "JMM 不是堆栈方法区，而是并发语义规则。多线程下，线程可能缓存变量，CPU 和编译器也可能重排指令，所以一个线程写入的数据，另一个线程不一定按代码顺序看到。JMM 用 happens-before 规则定义可见性边界，比如 volatile 写 happens-before 后续 volatile 读，unlock happens-before 后续 lock，线程 start 之前的操作对子线程可见，join 之后能看到子线程结果。",
+      "advancedAnswer": "高级回答可以补 volatile 与锁的边界。volatile 适合发布状态和禁止特定重排，但不保证复合操作原子性；锁既保证可见性，也通过互斥保护临界区复合状态。Atomic 类则常用 CAS 完成单变量原子更新。",
+      "essentialPoints": [
+        {
+          "point": "JMM 是并发语义规范"
+        },
+        {
+          "point": "可见性、原子性、有序性"
+        },
+        {
+          "point": "happens-before"
+        },
+        {
+          "point": "volatile 与锁的边界"
+        }
+      ],
+      "bonusPoints": [
+        {
+          "point": "前者是并发读写规范，后者是内存组织结构。",
+          "why": "JMM 和 JVM 运行时内存区域有什么区别？"
+        },
+        {
+          "point": "volatile 不保证复合操作互斥和原子性。",
+          "why": "volatile 为什么不能替代锁？"
+        }
+      ],
+      "advancedPoints": [],
+      "deductPoints": [
+        {
+          "point": "JMM 就是 JVM 的堆、栈、方法区这些运行时内存区域。",
+          "why": "运行时内存区域描述 JVM 如何组织内存；JMM 描述多线程读写共享变量的可见性和重排规则。"
+        }
+      ],
+      "followUps": [
+        {
+          "question": "JMM 和 JVM 运行时内存区域有什么区别？",
+          "difficulty": "medium",
+          "keyAnswer": "前者是并发读写规范，后者是内存组织结构。"
+        },
+        {
+          "question": "volatile 为什么不能替代锁？",
+          "difficulty": "medium",
+          "keyAnswer": "volatile 不保证复合操作互斥和原子性。"
+        }
+      ]
+    }
+  }
+}

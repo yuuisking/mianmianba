@@ -1,0 +1,22 @@
+{
+  "id": "bank-redis",
+  "name": "Redis题库",
+  "subtitle": "Redis 高频面试题库",
+  "tags": [
+    "Redis",
+    "缓存",
+    "高可用",
+    "数据结构",
+    "面试"
+  ],
+  "updatedAt": "2026-05-09",
+  "stats": {
+    "topics": 14,
+    "paths": 4
+  },
+  "description": "覆盖数据结构、持久化、高可用和缓存问题，是 Redis 面试最常见的题库。",
+  "visibility": "public",
+  "sortOrder": 0,
+  "cover": "R",
+  "defaultTopicId": null
+}

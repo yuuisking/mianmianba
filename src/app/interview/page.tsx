@@ -6,12 +6,13 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuthDialog } from "@/components/auth/AuthDialogProvider";
+import { ThinkingBubble } from "@/components/interview/ThinkingBubble";
 import {
+  buildInterviewRoomKey,
   buildInterviewLimitStrategy,
   getActiveInterviewSessionStorageKey,
   getInterviewHistoryStorageKey,
   getInterviewModeLabel,
-  getLatestInterviewHistoryStorageKey,
   getRemainingQuestionCount,
   isRealtimeInterviewMode,
   normalizeInterviewMode,
@@ -35,6 +36,34 @@ type MicStatus =
   | "error";
 
 type CameraStatus = "off" | "requesting" | "on" | "error";
+type ThinkingStatus =
+  | "正在同步你的回答"
+  | "面试官思考中"
+  | "进一步检索资料中"
+  | "正在生成下一轮追问"
+  | "正在恢复上次对话";
+
+type CodingSessionView = {
+  id: string;
+  language: string;
+  status: string;
+  starterCode?: string | null;
+  latestCode?: string | null;
+  codingMeta?: {
+    supportedLanguages?: string[];
+    starterByLanguage?: Record<string, string>;
+    durationMinutes?: number;
+  } | null;
+  question: {
+    id: string;
+    title?: string | null;
+    prompt: string;
+  };
+  submissions?: Array<{
+    id: string;
+    resultPayload?: Record<string, unknown> | null;
+  }>;
+};
 
 /**
  * 将面试官回答的 Markdown 文本做轻量标准化，复用学习助手已验证过的展示体验。
@@ -42,7 +71,28 @@ type CameraStatus = "off" | "requesting" | "on" | "error";
  * @returns {string} 适合 ReactMarkdown 渲染的文本。
  */
 function normalizeInterviewMarkdown(value: string): string {
-  return value.replace(/\n{3,}/g, "\n\n").trim();
+  const normalized = value.replace(/\n{3,}/g, "\n\n").trim();
+
+  return normalized
+    .replace(/(^|\n)\*\*(第[一二三四五六七八九十0-9]+个问题：)\*\*/g, "$1$2")
+    .replace(/(^|\n)\*\*(追问：|继续追问：|补充问题：)\*\*/g, "$1$2");
+}
+
+/**
+ * 安全解码服务端通过响应头传回的附加原因，避免非法编码导致前端再次报错。
+ * @param {string | null} value 响应头原始值。
+ * @returns {string} 解码后的原因文本。
+ */
+function decodeInterviewHeaderValue(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 type WindowWithWebkitAudioContext = Window & {
@@ -112,6 +162,306 @@ function createClosingMessage(text: string): InterviewMessage {
 }
 
 /**
+ * 统一读取浏览器存储，优先使用 `sessionStorage`，并在断开/崩溃场景下回退到 `localStorage`。
+ * @param key 存储键。
+ * @returns 对应值；不存在时返回 `null`。
+ */
+function readBrowserStorageValue(key: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const sessionValue = sessionStorage.getItem(key);
+    if (sessionValue) {
+      return sessionValue;
+    }
+  } catch (error) {
+    console.error("Failed to read sessionStorage value", error);
+  }
+
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    console.error("Failed to read localStorage value", error);
+    return null;
+  }
+}
+
+/**
+ * 将关键会话状态同时写入 `sessionStorage` 与 `localStorage`，提升断开后的恢复成功率。
+ * @param key 存储键。
+ * @param value 需要写入的值。
+ */
+function writeBrowserStorageValue(key: string, value: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (error) {
+    console.error("Failed to write sessionStorage value", error);
+  }
+
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.error("Failed to write localStorage value", error);
+  }
+}
+
+/**
+ * 同时清理 `sessionStorage` 与 `localStorage` 中的同名键，避免结束后的脏状态残留。
+ * @param key 存储键。
+ */
+function removeBrowserStorageValue(key: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    sessionStorage.removeItem(key);
+  } catch (error) {
+    console.error("Failed to remove sessionStorage value", error);
+  }
+
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error("Failed to remove localStorage value", error);
+  }
+}
+
+/**
+ * 为报告页生成当前会话专属的历史缓存键，避免结束跳转后报告页拿不到当前房间的完整记录。
+ * @param sessionId 当前面试会话 ID。
+ * @returns 会话级报告历史缓存键。
+ */
+function getReportHistoryStorageKey(sessionId: string): string {
+  return `reportHistory:${sessionId}`;
+}
+
+/**
+ * 根据已恢复的消息推算当前已完成轮次，统一以用户发言数为准。
+ * @param messages 当前消息列表。
+ * @returns 已完成轮次数量。
+ */
+function countCompletedRoundsFromMessages(messages: InterviewMessage[]): number {
+  return messages.filter((message) => message.role === "user").length;
+}
+
+/**
+ * 转义正则中的特殊字符，避免项目名包含括号或符号时误伤匹配规则。
+ * @param {string} value 原始文本。
+ * @returns {string} 可安全放入正则中的文本。
+ */
+function escapeRegexText(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * 只在“项目名同时出现在简历原文或真实对话”时才允许带入算法题引导语，避免沿用脏画像产生 AI 幻觉。
+ * @param input 当前画像与对话上下文。
+ * @returns {string | null} 已通过校验的真实项目名；否则返回 `null`。
+ */
+function resolveVerifiedCodingProjectName(input: {
+  profile: InterviewProfileState | null;
+  messages: InterviewMessage[];
+}): string | null {
+  const candidateProjects = (input.profile?.projects || [])
+    .map((item) => item.name?.trim() || "")
+    .filter(Boolean);
+  if (candidateProjects.length === 0) {
+    return null;
+  }
+
+  const transcript = input.messages
+    .filter((message) => message.role === "user")
+    .map((message) => message.content.join(" "))
+    .join("\n");
+  const resumeText =
+    input.profile?.resumeSummaryMarkdown ||
+    input.profile?.desc ||
+    "";
+  const evidenceText = `${resumeText}\n${transcript}`.trim();
+  if (!evidenceText) {
+    return null;
+  }
+
+  return (
+    candidateProjects.find((projectName) => {
+      const pattern = new RegExp(escapeRegexText(projectName), "i");
+      return pattern.test(evidenceText);
+    }) || null
+  );
+}
+
+/**
+ * 从浏览器缓存读取最近一次面试历史快照，优先匹配当前 launchId。
+ * @param roomKey 当前房间隔离键。
+ * @param launchId 当前面试发起标识。
+ * @returns 可用于恢复的历史快照；不存在时返回 `null`。
+ */
+function readStoredInterviewHistorySnapshot(
+  roomKey: string,
+  launchId: string
+): InterviewHistorySnapshot | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const candidateKeys = Array.from(
+    new Set(
+      [
+        roomKey ? getInterviewHistoryStorageKey(roomKey) : "",
+        roomKey.startsWith("launch:") && launchId ? `interviewHistory:${launchId}` : "",
+      ].filter(Boolean)
+    )
+  );
+
+  for (const key of candidateKeys) {
+    const raw = readBrowserStorageValue(key);
+    if (!raw) {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as InterviewHistorySnapshot;
+      if (!parsed || !Array.isArray(parsed.messages) || parsed.messages.length === 0) {
+        continue;
+      }
+
+      if (roomKey && parsed.roomKey && parsed.roomKey !== roomKey) {
+        continue;
+      }
+
+      if (
+        roomKey &&
+        !parsed.roomKey &&
+        (parsed.planId || parsed.stageId || parsed.roundId)
+      ) {
+        const parsedRoomKey = buildInterviewRoomKey({
+          planId: parsed.planId,
+          stageId: parsed.stageId,
+          roundId: parsed.roundId,
+          launchId: parsed.launchId,
+          mode: parsed.mode,
+        });
+        if (parsedRoomKey !== roomKey) {
+          continue;
+        }
+      }
+
+      if (launchId && parsed.launchId && parsed.launchId !== launchId) {
+        continue;
+      }
+
+      return parsed;
+    } catch (error) {
+      console.error("Failed to read stored interview history snapshot", error);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 清理当前房间的历史快照与活动会话缓存，避免旧污染状态再次被恢复链命中。
+ * @param {object} input 清理所需的房间与会话信息。
+ * @param {string} input.roomKey 当前房间隔离键。
+ * @param {string} input.launchId 当前发起标识。
+ * @param {string | null} input.activeSessionStorageKey 当前房间活动会话缓存键。
+ * @param {string | null} input.sessionId 待失效的会话标识。
+ */
+function clearStoredInterviewRuntimeCache(input: {
+  roomKey: string;
+  launchId: string;
+  activeSessionStorageKey: string | null;
+  sessionId?: string | null;
+}): void {
+  if (!input.roomKey) {
+    return;
+  }
+
+  removeBrowserStorageValue(getInterviewHistoryStorageKey(input.roomKey));
+  if (input.roomKey.startsWith("launch:") && input.launchId) {
+    removeBrowserStorageValue(`interviewHistory:${input.launchId}`);
+  }
+
+  if (!input.activeSessionStorageKey) {
+    return;
+  }
+
+  const currentStoredSessionId = readBrowserStorageValue(input.activeSessionStorageKey);
+  if (
+    !input.sessionId ||
+    !currentStoredSessionId ||
+    currentStoredSessionId === input.sessionId
+  ) {
+    removeBrowserStorageValue(input.activeSessionStorageKey);
+  }
+}
+
+/**
+ * 归一化恢复后的等待状态文案，避免旧快照或异常值污染 UI。
+ * @param value 快照中的等待状态。
+ * @returns 可直接展示的等待状态。
+ */
+function normalizeThinkingStatus(value: string | undefined | null): ThinkingStatus {
+  switch (value) {
+    case "正在同步你的回答":
+    case "面试官思考中":
+    case "进一步检索资料中":
+    case "正在生成下一轮追问":
+    case "正在恢复上次对话":
+      return value;
+    default:
+      return "面试官思考中";
+  }
+}
+
+/**
+ * 恢复历史消息时移除尾部空白占位，避免断开后看到一条空白 AI 气泡。
+ * @param messages 原始消息列表。
+ * @returns 清洗后的消息列表。
+ */
+function normalizeRestoredInterviewMessages(messages: InterviewMessage[]): InterviewMessage[] {
+  if (messages.length === 0) {
+    return messages;
+  }
+
+  const lastMessage = messages[messages.length - 1];
+  const lastContent = lastMessage?.content.join("\n").trim() || "";
+  if (lastMessage?.role === "ai" && !lastContent) {
+    return messages.slice(0, -1);
+  }
+
+  return messages;
+}
+
+/**
+ * 根据当前等待状态返回更明确的辅助提示，降低长等待时的卡死感。
+ * @param status 当前等待状态。
+ * @returns 对应的辅助文案。
+ */
+function getThinkingStatusHint(status: ThinkingStatus): string {
+  switch (status) {
+    case "正在同步你的回答":
+      return "先保存本轮回答，再继续追问。";
+    case "进一步检索资料中":
+      return "正在结合当前轮次和上下文整理追问线索。";
+    case "正在生成下一轮追问":
+      return "问题已开始生成，通常 10-15 秒内返回。";
+    case "正在恢复上次对话":
+      return "检测到刚才中断，正在恢复你的上一轮进度。";
+    case "面试官思考中":
+    default:
+      return "面试官正在组织追问，通常 10-15 秒内返回。";
+  }
+}
+
+/**
  * 将当前对话容器滚动到底部，确保流式回复时最新内容始终可见。
  * @param container 对话滚动容器。
  * @param anchor 底部定位锚点。
@@ -148,6 +498,25 @@ function parseInterviewStreamChunk(chunk: string): {
       .replaceAll("__STATUS_SEARCHING__", "")
       .replaceAll("__STATUS_GENERATING__", "")
   };
+}
+
+/**
+ * 根据结束原因映射当前会话状态，区分正常完成与中途退出淘汰。
+ * @param reason 当前结束原因。
+ * @returns 会话最终状态值。
+ */
+function resolveInterviewSessionStatus(reason: string): string {
+  const normalizedReason = reason.trim();
+  if (
+    normalizedReason.includes("关闭") ||
+    normalizedReason.includes("刷新") ||
+    normalizedReason.includes("离开") ||
+    normalizedReason.includes("主动结束")
+  ) {
+    return "eliminated_exited";
+  }
+
+  return "completed";
 }
 
 /**
@@ -487,6 +856,10 @@ const INTERVIEW_NAV_ITEMS = [
  */
 function buildHistorySnapshot(input: {
   sessionId: string | null;
+  roomKey: string;
+  planId?: string | null;
+  stageId?: string | null;
+  roundId?: string | null;
   mode: InterviewMode;
   messages: InterviewMessage[];
   elapsedTime: number;
@@ -495,9 +868,15 @@ function buildHistorySnapshot(input: {
   questionLimit: number | null;
   durationLimitMinutes: number | null;
   launchId?: string;
+  pendingAssistantReply?: boolean;
+  thinkingStatus?: ThinkingStatus;
 }): InterviewHistorySnapshot {
   const {
     sessionId,
+    roomKey,
+    planId,
+    stageId,
+    roundId,
     mode,
     messages,
     elapsedTime,
@@ -505,11 +884,17 @@ function buildHistorySnapshot(input: {
     limitType,
     questionLimit,
     durationLimitMinutes,
-    launchId
+    launchId,
+    pendingAssistantReply,
+    thinkingStatus
   } = input;
 
   return {
     sessionId: sessionId || undefined,
+    roomKey,
+    planId: planId || undefined,
+    stageId: stageId || undefined,
+    roundId: roundId || undefined,
     mode,
     messages,
     elapsedTime,
@@ -518,7 +903,9 @@ function buildHistorySnapshot(input: {
     limitType,
     questionLimit,
     durationLimitMinutes,
-    launchId
+    launchId,
+    pendingAssistantReply,
+    thinkingStatus
   };
 }
 
@@ -532,7 +919,24 @@ function InterviewContent() {
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const { requestAuth } = useAuthDialog();
-  const initialProfile = useMemo(() => readStoredInterviewProfile(), []);
+  const planIdFromQuery = searchParams.get("planId") || "";
+  const stageIdFromQuery = searchParams.get("stageId") || "";
+  const roundIdFromQuery = searchParams.get("roundId") || "";
+  const queryMode = normalizeInterviewMode(searchParams.get("mode") || "text");
+  const queryRoomKey = useMemo(
+    () =>
+      buildInterviewRoomKey({
+        planId: planIdFromQuery,
+        stageId: stageIdFromQuery,
+        roundId: roundIdFromQuery,
+        mode: queryMode,
+      }),
+    [planIdFromQuery, queryMode, roundIdFromQuery, stageIdFromQuery]
+  );
+  const initialProfile = useMemo(
+    () => readStoredInterviewProfile(queryRoomKey),
+    [queryRoomKey]
+  );
   const mode = normalizeInterviewMode(
     searchParams.get("mode") || initialProfile?.mode || "text"
   );
@@ -546,17 +950,22 @@ function InterviewContent() {
   const [completedRounds, setCompletedRounds] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
-  const [thinkingStatus, setThinkingStatus] = useState<
-    "面试官思考中" | "进一步检索资料中"
-  >("面试官思考中");
+  const [thinkingStatus, setThinkingStatus] = useState<ThinkingStatus>("面试官思考中");
   const [showLimitAlert, setShowLimitAlert] = useState(false);
   const [limitAlertMessage, setLimitAlertMessage] = useState("");
   const [showExitDialog, setShowExitDialog] = useState(false);
+  const [showCodingOfferDialog, setShowCodingOfferDialog] = useState(false);
+  const [codingOfferReason, setCodingOfferReason] = useState("");
+  const [codingSession, setCodingSession] = useState<CodingSessionView | null>(null);
+  const [codingBusy, setCodingBusy] = useState(false);
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(
     null
   );
   const [isExitConfirming, setIsExitConfirming] = useState(false);
   const [roomSessionId, setRoomSessionId] = useState<string | null>(null);
+  const [conversationSource, setConversationSource] = useState<"idle" | "opening" | "restored">(
+    "idle"
+  );
   const [autoEnding, setAutoEnding] = useState(false);
   const [needsInteraction, setNeedsInteraction] = useState(isRealtimeMode);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -591,6 +1000,8 @@ function InterviewContent() {
   const elapsedTimeRef = useRef(elapsedTime);
   const completedRoundsRef = useRef(completedRounds);
   const isTypingRef = useRef(isTyping);
+  const pendingAssistantReplyRef = useRef(false);
+  const thinkingStatusRef = useRef<ThinkingStatus>(thinkingStatus);
   const isInterruptedRef = useRef(false);
   const handleSendMessageRef = useRef<
     (rawText: string, overrideTag?: string) => Promise<void>
@@ -614,6 +1025,7 @@ function InterviewContent() {
   const assistantTurnIdRef = useRef(0);
   const assistantStreamingPreviewRef = useRef("");
   const assistantCaptionCommittedRef = useRef("");
+  const hydratedRoomKeyRef = useRef<string | null>(null);
   const limitType = profile?.limitType ?? "none";
   const questionLimit = profile?.questionLimit ?? null;
   const durationLimitMinutes = profile?.durationLimitMinutes ?? null;
@@ -622,18 +1034,46 @@ function InterviewContent() {
     questionLimit,
     durationLimitMinutes
   );
-  const modeLabel = getInterviewModeLabel(mode, Boolean(profile?.videoEnabled));
+  const modeLabel =
+    profile?.displayInterviewModeLabel?.trim() ||
+    getInterviewModeLabel(mode, Boolean(profile?.videoEnabled));
   const launchId = profile?.launchId || "";
-  const activeSessionStorageKey = launchId
-    ? getActiveInterviewSessionStorageKey(launchId)
+  const currentRoomKey = useMemo(
+    () =>
+      buildInterviewRoomKey({
+        planId: planIdFromQuery || profile?.interviewPlanId,
+        stageId: stageIdFromQuery || profile?.interviewStageId,
+        roundId: roundIdFromQuery || profile?.interviewRoundId,
+        launchId: profile?.launchId || initialProfile?.launchId,
+        mode,
+      }),
+    [
+      initialProfile?.launchId,
+      mode,
+      planIdFromQuery,
+      profile?.interviewPlanId,
+      profile?.interviewRoundId,
+      profile?.interviewStageId,
+      profile?.launchId,
+      roundIdFromQuery,
+      stageIdFromQuery,
+    ]
+  );
+  const activeSessionStorageKey = currentRoomKey
+    ? getActiveInterviewSessionStorageKey(currentRoomKey)
     : null;
   const currentQuestionNumber = useMemo(() => {
+    const firstAssistantMessage = messages.find((message) => message.role === "ai");
+    const introAdjustedRoundCount =
+      firstAssistantMessage?.content.join(" ").includes("请先做一个自我介绍")
+        ? Math.max(0, completedRounds - 1)
+        : completedRounds;
     if (questionLimit) {
-      return Math.min(completedRounds + 1, questionLimit);
+      return Math.min(introAdjustedRoundCount + 1, questionLimit);
     }
 
-    return completedRounds + 1;
-  }, [completedRounds, questionLimit]);
+    return introAdjustedRoundCount + 1;
+  }, [completedRounds, messages, questionLimit]);
   const remainingQuestionCount = getRemainingQuestionCount(
     questionLimit,
     completedRounds
@@ -646,6 +1086,10 @@ function InterviewContent() {
   useEffect(() => {
     currentSessionIdRef.current = roomSessionId;
   }, [roomSessionId]);
+
+  useEffect(() => {
+    thinkingStatusRef.current = thinkingStatus;
+  }, [thinkingStatus]);
 
   useEffect(() => {
     elapsedTimeRef.current = elapsedTime;
@@ -662,6 +1106,39 @@ function InterviewContent() {
   useEffect(() => {
     micStatusRef.current = micStatus;
   }, [micStatus]);
+
+  /**
+   * 当用户在同一个 `/interview` 页面内切到新的房间参数时，先清空上一房间的内存态，
+   * 避免 React 继续复用旧消息列表并把它错误带入新房间。
+   */
+  useEffect(() => {
+    if (!currentRoomKey) {
+      return;
+    }
+
+    if (!hydratedRoomKeyRef.current) {
+      hydratedRoomKeyRef.current = currentRoomKey;
+      return;
+    }
+
+    if (hydratedRoomKeyRef.current === currentRoomKey) {
+      return;
+    }
+
+    hydratedRoomKeyRef.current = currentRoomKey;
+    currentSessionIdRef.current = null;
+    pendingAssistantReplyRef.current = false;
+    initialMessagePersistedRef.current = false;
+    hasFinalizedRef.current = false;
+    setRoomSessionId(null);
+    setMessages([]);
+    setElapsedTime(0);
+    setCompletedRounds(0);
+    setConversationSource("idle");
+    setIsTyping(false);
+    setIsThinking(false);
+    setThinkingStatus("面试官思考中");
+  }, [currentRoomKey]);
 
   useEffect(() => {
     if (profile?.videoEnabled) {
@@ -705,6 +1182,10 @@ function InterviewContent() {
     ) => {
       const snapshot = buildHistorySnapshot({
         sessionId: currentSessionIdRef.current,
+        roomKey: currentRoomKey,
+        planId: profile?.interviewPlanId || planIdFromQuery,
+        stageId: profile?.interviewStageId || stageIdFromQuery,
+        roundId: profile?.interviewRoundId || roundIdFromQuery,
         mode,
         messages: overrideMessages ?? messagesRef.current,
         elapsedTime: overrideElapsed ?? elapsedTimeRef.current,
@@ -712,22 +1193,33 @@ function InterviewContent() {
         limitType,
         questionLimit,
         durationLimitMinutes,
-        launchId
+        launchId,
+        pendingAssistantReply: pendingAssistantReplyRef.current,
+        thinkingStatus: thinkingStatusRef.current
       });
 
-      if (launchId) {
-        sessionStorage.setItem(
-          getInterviewHistoryStorageKey(launchId),
+      if (currentRoomKey) {
+        writeBrowserStorageValue(
+          getInterviewHistoryStorageKey(currentRoomKey),
           JSON.stringify(snapshot)
         );
       }
 
-      sessionStorage.setItem(
-        getLatestInterviewHistoryStorageKey(),
-        JSON.stringify(snapshot)
-      );
     },
-    [durationLimitMinutes, launchId, limitType, mode, questionLimit]
+    [
+      currentRoomKey,
+      durationLimitMinutes,
+      limitType,
+      launchId,
+      mode,
+      planIdFromQuery,
+      profile?.interviewPlanId,
+      profile?.interviewRoundId,
+      profile?.interviewStageId,
+      questionLimit,
+      roundIdFromQuery,
+      stageIdFromQuery,
+    ]
   );
 
   /**
@@ -744,23 +1236,349 @@ function InterviewContent() {
   }, [input]);
 
   /**
-   * 初始化开场消息，并确保房间始终基于真实画像而不是默认假数据。
+   * 初始化房间消息：优先恢复历史快照，其次回源服务端消息，最后才回退到开场题。
    */
   useEffect(() => {
-    const latestProfile = readStoredInterviewProfile();
-    setProfile(latestProfile);
-    setNeedsInteraction(isRealtimeMode);
+    let cancelled = false;
 
-    const opening = buildInterviewOpening(mode, latestProfile, topic, desc);
-    setMessages([
-      {
-        role: "ai",
-        content: opening,
-        time: buildMessageTime(),
-        tag: ""
+    async function bootstrapConversation(): Promise<void> {
+      const latestProfile = readStoredInterviewProfile(currentRoomKey);
+      setProfile(latestProfile);
+      setNeedsInteraction(isRealtimeMode);
+
+      const storedSessionId =
+        typeof window !== "undefined" && activeSessionStorageKey
+          ? readBrowserStorageValue(activeSessionStorageKey)
+          : null;
+
+      const historySnapshot = readStoredInterviewHistorySnapshot(
+        currentRoomKey,
+        latestProfile?.launchId || launchId
+      );
+      if (!cancelled && historySnapshot?.messages?.length) {
+        const snapshotSessionId =
+          typeof historySnapshot.sessionId === "string" && historySnapshot.sessionId.trim()
+            ? historySnapshot.sessionId.trim()
+            : typeof storedSessionId === "string" && storedSessionId.trim()
+              ? storedSessionId.trim()
+              : "";
+        const hasPendingAssistantReply = Boolean(historySnapshot.pendingAssistantReply);
+
+        if (!hasPendingAssistantReply && session?.user?.id && snapshotSessionId) {
+          try {
+            const params = new URLSearchParams({
+              sessionId: snapshotSessionId,
+              mode,
+            });
+            if (planIdFromQuery || latestProfile?.interviewPlanId) {
+              params.set("planId", planIdFromQuery || latestProfile?.interviewPlanId || "");
+            }
+            if (stageIdFromQuery || latestProfile?.interviewStageId) {
+              params.set("stageId", stageIdFromQuery || latestProfile?.interviewStageId || "");
+            }
+            if (roundIdFromQuery || latestProfile?.interviewRoundId) {
+              params.set("roundId", roundIdFromQuery || latestProfile?.interviewRoundId || "");
+            }
+
+            const response = await fetch(`/api/messages?${params.toString()}`);
+            const payload = (await response.json()) as {
+              data?: Array<{ role?: string; content?: string; createdAt?: string }>;
+              error?: string;
+            };
+
+            if (response.ok && Array.isArray(payload.data) && payload.data.length > 0) {
+              const restoredMessages: InterviewMessage[] = payload.data.map((message) => ({
+                role: message.role === "assistant" ? "ai" : "user",
+                content:
+                  typeof message.content === "string" && message.content.trim()
+                    ? message.content.split("\n")
+                    : [""],
+                time:
+                  typeof message.createdAt === "string"
+                    ? new Date(message.createdAt).toLocaleTimeString("zh-CN", {
+                        hour12: false,
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : buildMessageTime(),
+                tag: "",
+              }));
+
+              const restoredRounds = countCompletedRoundsFromMessages(restoredMessages);
+              currentSessionIdRef.current = snapshotSessionId;
+              if (activeSessionStorageKey) {
+                writeBrowserStorageValue(activeSessionStorageKey, snapshotSessionId);
+              }
+              pendingAssistantReplyRef.current = false;
+              hydratedRoomKeyRef.current = currentRoomKey;
+              setMessages(restoredMessages);
+              setElapsedTime(historySnapshot.elapsedTime || 0);
+              setCompletedRounds(restoredRounds);
+              setIsTyping(false);
+              setIsThinking(false);
+              setThinkingStatus("面试官思考中");
+              setRoomSessionId(snapshotSessionId);
+              initialMessagePersistedRef.current = true;
+              persistHistorySnapshot(
+                restoredMessages,
+                historySnapshot.elapsedTime || 0,
+                restoredRounds
+              );
+              setConversationSource("restored");
+              return;
+            }
+
+            clearStoredInterviewRuntimeCache({
+              roomKey: currentRoomKey,
+              launchId: latestProfile?.launchId || launchId,
+              activeSessionStorageKey,
+              sessionId: snapshotSessionId,
+            });
+          } catch (error) {
+            console.error("Failed to validate stored interview history snapshot", error);
+            clearStoredInterviewRuntimeCache({
+              roomKey: currentRoomKey,
+              launchId: latestProfile?.launchId || launchId,
+              activeSessionStorageKey,
+              sessionId: snapshotSessionId,
+            });
+          }
+        } else {
+          if (snapshotSessionId) {
+            currentSessionIdRef.current = snapshotSessionId;
+            if (activeSessionStorageKey) {
+              writeBrowserStorageValue(activeSessionStorageKey, snapshotSessionId);
+            }
+          }
+          const restoredMessages = normalizeRestoredInterviewMessages(historySnapshot.messages);
+          const restoredThinkingStatus = hasPendingAssistantReply
+            ? normalizeThinkingStatus(historySnapshot.thinkingStatus)
+            : "面试官思考中";
+          pendingAssistantReplyRef.current = hasPendingAssistantReply;
+          hydratedRoomKeyRef.current = currentRoomKey;
+          setMessages(restoredMessages);
+          setElapsedTime(historySnapshot.elapsedTime || 0);
+          setCompletedRounds(
+            typeof historySnapshot.completedRounds === "number"
+              ? historySnapshot.completedRounds
+              : countCompletedRoundsFromMessages(restoredMessages)
+          );
+          setIsTyping(hasPendingAssistantReply);
+          setIsThinking(hasPendingAssistantReply);
+          setThinkingStatus(
+            hasPendingAssistantReply ? restoredThinkingStatus : "面试官思考中"
+          );
+          if (snapshotSessionId) {
+            initialMessagePersistedRef.current = true;
+            setRoomSessionId(snapshotSessionId);
+          }
+          setConversationSource("restored");
+          return;
+        }
       }
-    ]);
-  }, [desc, isRealtimeMode, mode, topic]);
+
+      if (!cancelled && session?.user?.id && storedSessionId) {
+        try {
+          const params = new URLSearchParams({
+            sessionId: storedSessionId,
+            mode,
+          });
+          if (planIdFromQuery || latestProfile?.interviewPlanId) {
+            params.set("planId", planIdFromQuery || latestProfile?.interviewPlanId || "");
+          }
+          if (stageIdFromQuery || latestProfile?.interviewStageId) {
+            params.set("stageId", stageIdFromQuery || latestProfile?.interviewStageId || "");
+          }
+          if (roundIdFromQuery || latestProfile?.interviewRoundId) {
+            params.set("roundId", roundIdFromQuery || latestProfile?.interviewRoundId || "");
+          }
+          const response = await fetch(`/api/messages?${params.toString()}`);
+          const payload = (await response.json()) as {
+            data?: Array<{ role?: string; content?: string; createdAt?: string }>;
+            error?: string;
+          };
+
+          if (response.ok && Array.isArray(payload.data) && payload.data.length > 0) {
+            const restoredMessages: InterviewMessage[] = payload.data.map((message) => ({
+              role: message.role === "assistant" ? "ai" : "user",
+              content:
+                typeof message.content === "string" && message.content.trim()
+                  ? message.content.split("\n")
+                  : [""],
+              time:
+                typeof message.createdAt === "string"
+                  ? new Date(message.createdAt).toLocaleTimeString("zh-CN", {
+                      hour12: false,
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : buildMessageTime(),
+              tag: "",
+            }));
+
+            const restoredRounds = countCompletedRoundsFromMessages(restoredMessages);
+            const restoredElapsedTime = historySnapshot?.elapsedTime || 0;
+            currentSessionIdRef.current = storedSessionId;
+            if (activeSessionStorageKey) {
+              writeBrowserStorageValue(activeSessionStorageKey, storedSessionId);
+            }
+            pendingAssistantReplyRef.current = false;
+            setMessages(restoredMessages);
+            setElapsedTime(restoredElapsedTime);
+            setCompletedRounds(restoredRounds);
+            setRoomSessionId(storedSessionId);
+            initialMessagePersistedRef.current = true;
+            persistHistorySnapshot(restoredMessages, restoredElapsedTime, restoredRounds);
+            hydratedRoomKeyRef.current = currentRoomKey;
+            setConversationSource("restored");
+            return;
+          }
+        } catch (error) {
+          console.error("Failed to restore interview messages from server", error);
+        }
+      }
+
+      if (!cancelled) {
+        const opening = buildInterviewOpening(mode, latestProfile, topic, desc);
+        hydratedRoomKeyRef.current = currentRoomKey;
+        setMessages([
+          {
+            role: "ai",
+            content: opening,
+            time: buildMessageTime(),
+            tag: "",
+          },
+        ]);
+        setCompletedRounds(0);
+        setConversationSource("opening");
+      }
+    }
+
+    void bootstrapConversation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeSessionStorageKey,
+    currentRoomKey,
+    desc,
+    isRealtimeMode,
+    launchId,
+    mode,
+    planIdFromQuery,
+    persistHistorySnapshot,
+    roundIdFromQuery,
+    session?.user?.id,
+    stageIdFromQuery,
+    topic,
+  ]);
+
+  /**
+   * 当用户从全流程列表“继续当前轮次”或刷新页面进入时，尝试从服务端恢复运行时画像，
+   * 避免房间过度依赖本地 sessionStorage。
+   */
+  useEffect(() => {
+    if (!session?.user?.id || !planIdFromQuery) {
+      return;
+    }
+
+    const shouldRecoverFromServer =
+      !profile?.role ||
+      profile?.interviewPlanId !== planIdFromQuery ||
+      (roundIdFromQuery && profile?.interviewRoundId !== roundIdFromQuery);
+    if (!shouldRecoverFromServer) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function recoverInterviewProfile(): Promise<void> {
+      try {
+        const params = new URLSearchParams({
+          planId: planIdFromQuery,
+        });
+        if (stageIdFromQuery) {
+          params.set("stageId", stageIdFromQuery);
+        }
+        if (roundIdFromQuery) {
+          params.set("roundId", roundIdFromQuery);
+        }
+
+        const response = await fetch(`/api/v2/interview-plans?${params.toString()}`);
+        const payload = (await response.json()) as { data?: InterviewProfileState; error?: string };
+        if (!response.ok || !payload.data || cancelled) {
+          return;
+        }
+
+        const fallbackLaunchId =
+          profile?.launchId || readStoredInterviewProfile(currentRoomKey)?.launchId;
+        const mergedProfile: InterviewProfileState = {
+          ...payload.data,
+          launchId: fallbackLaunchId,
+          mode,
+          interviewRoomKey: buildInterviewRoomKey({
+            planId: payload.data.interviewPlanId,
+            stageId: payload.data.interviewStageId,
+            roundId: payload.data.interviewRoundId,
+            launchId: fallbackLaunchId,
+            mode,
+          }),
+        };
+        writeStoredInterviewProfile(mergedProfile, mergedProfile.interviewRoomKey);
+        setProfile(mergedProfile);
+        setMessages((current) => {
+          if (
+            conversationSource === "restored" &&
+            hydratedRoomKeyRef.current === currentRoomKey &&
+            current.length > 0
+          ) {
+            return current;
+          }
+
+          if (hydratedRoomKeyRef.current === currentRoomKey && current.length > 1) {
+            return current;
+          }
+
+          const opening = buildInterviewOpening(mode, mergedProfile, topic, desc);
+          return [
+            {
+              role: "ai",
+              content: opening,
+              time: buildMessageTime(),
+              tag: "",
+            },
+          ];
+        });
+        if (conversationSource !== "restored") {
+          setConversationSource("opening");
+        }
+      } catch (error) {
+        console.error("Failed to recover interview runtime profile", error);
+      }
+    }
+
+    void recoverInterviewProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    conversationSource,
+    currentRoomKey,
+    desc,
+    mode,
+    planIdFromQuery,
+    persistHistorySnapshot,
+    profile?.launchId,
+    profile?.interviewPlanId,
+    profile?.interviewRoundId,
+    profile?.role,
+    roundIdFromQuery,
+    session?.user?.id,
+    stageIdFromQuery,
+    topic,
+  ]);
 
   /**
    * 维护房间内计时器，并在达到时长上限后触发自动结束。
@@ -812,10 +1630,44 @@ function InterviewContent() {
     creationPromiseRef.current = (async () => {
       try {
         if (activeSessionStorageKey) {
-          const storedSessionId = sessionStorage.getItem(activeSessionStorageKey);
+          const storedSessionId = readBrowserStorageValue(activeSessionStorageKey);
           if (storedSessionId) {
-            setRoomSessionId(storedSessionId);
-            return storedSessionId;
+            try {
+              const validationResponse = await fetch(`/api/sessions/${storedSessionId}`);
+              const validationPayload = (await validationResponse.json()) as {
+                data?: {
+                  planId?: string | null;
+                  stageId?: string | null;
+                  roundId?: string | null;
+                  mode?: string | null;
+                  roomKey?: string | null;
+                };
+              };
+              const validatedRoomKey =
+                typeof validationPayload.data?.roomKey === "string"
+                  ? validationPayload.data.roomKey
+                  : "";
+              const matchesCurrentRoom =
+                validationResponse.ok &&
+                validationPayload.data &&
+                (
+                  (validatedRoomKey && validatedRoomKey === currentRoomKey) ||
+                  (
+                    (validationPayload.data.planId || "") === (planIdFromQuery || profile?.interviewPlanId || "") &&
+                    (validationPayload.data.stageId || "") === (stageIdFromQuery || profile?.interviewStageId || "") &&
+                    (validationPayload.data.roundId || "") === (roundIdFromQuery || profile?.interviewRoundId || "") &&
+                    normalizeInterviewMode(validationPayload.data.mode || mode) === mode
+                  )
+                );
+              if (matchesCurrentRoom) {
+                currentSessionIdRef.current = storedSessionId;
+                setRoomSessionId(storedSessionId);
+                return storedSessionId;
+              }
+            } catch (error) {
+              console.error("Failed to validate stored interview session", error);
+            }
+            removeBrowserStorageValue(activeSessionStorageKey);
           }
         }
 
@@ -824,7 +1676,12 @@ function InterviewContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             mode,
-            status: "ongoing"
+            status: "ongoing",
+            roomKey: currentRoomKey,
+            planId: planIdFromQuery || profile?.interviewPlanId,
+            stageId: stageIdFromQuery || profile?.interviewStageId,
+            roundId: roundIdFromQuery || profile?.interviewRoundId,
+            sourceLaunchId: profile?.launchId || initialProfile?.launchId,
           })
         });
 
@@ -835,9 +1692,10 @@ function InterviewContent() {
         const payload = (await response.json()) as { data?: { id?: string } };
         const createdId = payload.data?.id || null;
         if (createdId) {
+          currentSessionIdRef.current = createdId;
           setRoomSessionId(createdId);
           if (activeSessionStorageKey) {
-            sessionStorage.setItem(activeSessionStorageKey, createdId);
+            writeBrowserStorageValue(activeSessionStorageKey, createdId);
           }
         }
 
@@ -851,7 +1709,20 @@ function InterviewContent() {
     })();
 
     return creationPromiseRef.current;
-  }, [activeSessionStorageKey, mode, session?.user?.id]);
+  }, [
+    activeSessionStorageKey,
+    currentRoomKey,
+    initialProfile?.launchId,
+    mode,
+    planIdFromQuery,
+    profile?.interviewPlanId,
+    profile?.interviewRoundId,
+    profile?.interviewStageId,
+    profile?.launchId,
+    roundIdFromQuery,
+    session?.user?.id,
+    stageIdFromQuery,
+  ]);
 
   /**
    * 将单条消息实时落库，确保离开页面后仍能保留本次对话记录。
@@ -867,6 +1738,11 @@ function InterviewContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sessionId,
+            roomKey: currentRoomKey,
+            planId: profile?.interviewPlanId || planIdFromQuery,
+            stageId: profile?.interviewStageId || stageIdFromQuery,
+            roundId: profile?.interviewRoundId || roundIdFromQuery,
+            mode,
             role,
             content
           })
@@ -875,28 +1751,214 @@ function InterviewContent() {
         console.error("Failed to persist interview message", error);
       }
     },
-    []
+    [currentRoomKey, mode, planIdFromQuery, profile?.interviewPlanId, profile?.interviewRoundId, profile?.interviewStageId, roundIdFromQuery, stageIdFromQuery]
   );
+
+  /**
+   * 将服务端返回的算法题会话详情写入前端状态，统一恢复题面、代码和最近结果。
+   * @param nextSession 最新算法题会话详情。
+   */
+  const hydrateCodingSession = useCallback((nextSession: CodingSessionView): void => {
+    setCodingSession(nextSession);
+    setProfile((current) => {
+      if (!current) {
+        return current;
+      }
+      const nextProfile = {
+        ...current,
+        codingSessionId: nextSession.id,
+        codingRequired: true,
+        currentRoundStatus: "CODING",
+      };
+      writeStoredInterviewProfile(nextProfile, nextProfile.interviewRoomKey);
+      return nextProfile;
+    });
+  }, []);
+
+  /**
+   * 在刷新恢复或重新进入房间时读取当前轮次已有的算法题会话，避免用户丢题。
+   */
+  const loadExistingCodingSession = useCallback(async (): Promise<void> => {
+    if (!session?.user?.id) {
+      return;
+    }
+    const targetCodingSessionId = profile?.codingSessionId?.trim() || "";
+    const targetRoundId = profile?.interviewRoundId || roundIdFromQuery;
+    if (!targetCodingSessionId && !targetRoundId) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (targetCodingSessionId) {
+      params.set("codingSessionId", targetCodingSessionId);
+    } else if (targetRoundId) {
+      params.set("roundId", targetRoundId);
+    }
+
+    const response = await fetch(`/api/v2/coding-sessions?${params.toString()}`);
+    if (!response.ok) {
+      return;
+    }
+    const payload = (await response.json()) as { data?: CodingSessionView };
+    if (payload.data) {
+      hydrateCodingSession(payload.data);
+    }
+  }, [hydrateCodingSession, profile?.codingSessionId, profile?.interviewRoundId, roundIdFromQuery, session?.user?.id]);
+
+  /**
+   * 当当前轮次已进入算法题状态，或当前房间已存在算法题会话时，自动恢复题面与代码。
+   */
+  useEffect(() => {
+    if (
+      codingSession ||
+      (!profile?.codingSessionId &&
+        profile?.currentRoundStatus !== "CODING" &&
+        !profile?.codingRequired)
+    ) {
+      return;
+    }
+
+    void loadExistingCodingSession();
+  }, [
+    codingSession,
+    loadExistingCodingSession,
+    profile?.codingRequired,
+    profile?.codingSessionId,
+    profile?.currentRoundStatus,
+  ]);
+
+  /**
+   * 创建或复用当前轮次的算法题会话。
+   * @returns 创建后的算法题会话详情。
+   */
+  const ensureCodingChallengeSession = useCallback(async (): Promise<CodingSessionView> => {
+    const roundId = profile?.interviewRoundId || roundIdFromQuery;
+    if (!roundId) {
+      throw new Error("当前轮次缺少 roundId，无法进入算法题。");
+    }
+    const verifiedProjectName = resolveVerifiedCodingProjectName({
+      profile,
+      messages: messagesRef.current,
+    });
+
+    const response = await fetch("/api/v2/coding-sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        roundId,
+        stageId: profile?.interviewStageId || stageIdFromQuery,
+        role: profile?.targetRoleName || profile?.role,
+        companyName: profile?.companyName,
+        projectName: verifiedProjectName,
+      }),
+    });
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(payload.error || "创建算法题会话失败");
+    }
+    const payload = (await response.json()) as { data: CodingSessionView };
+    hydrateCodingSession(payload.data);
+    return payload.data;
+  }, [hydrateCodingSession, profile, roundIdFromQuery, stageIdFromQuery]);
+
+  /**
+   * 一旦当前轮次进入算法题，会立即切换到独立的 `/coding` 页面，避免题面和聊天区混在同一屏。
+   */
+  useEffect(() => {
+    if (!codingSession?.id) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (planIdFromQuery) {
+      params.set("planId", planIdFromQuery);
+    }
+    if (stageIdFromQuery) {
+      params.set("stageId", stageIdFromQuery);
+    }
+    if (roundIdFromQuery || profile?.interviewRoundId) {
+      params.set("roundId", profile?.interviewRoundId || roundIdFromQuery || "");
+    }
+    params.set("mode", mode);
+    params.set("codingSessionId", codingSession.id);
+    if (roomSessionId || currentSessionIdRef.current) {
+      params.set("sessionId", roomSessionId || currentSessionIdRef.current || "");
+    }
+
+    router.replace(`/coding?${params.toString()}`);
+  }, [
+    codingSession?.id,
+    mode,
+    planIdFromQuery,
+    profile?.interviewRoundId,
+    roomSessionId,
+    roundIdFromQuery,
+    router,
+    stageIdFromQuery,
+  ]);
+
+  /**
+   * 处理候选人确认进入算法题的动作，并立即加载题面。
+   */
+  const handleAcceptCodingOffer = useCallback(() => {
+    if (!session?.user?.id) {
+      requireActionAuth(handleAcceptCodingOffer, "登录后进入算法题");
+      return;
+    }
+
+    setShowCodingOfferDialog(false);
+    void (async () => {
+      try {
+        setCodingBusy(true);
+        await ensureCodingChallengeSession();
+      } catch (error) {
+        console.error("Failed to start coding challenge", error);
+        setLimitAlertMessage(
+          error instanceof Error ? error.message : "进入算法题失败，请稍后重试。"
+        );
+        setShowLimitAlert(true);
+      } finally {
+        setCodingBusy(false);
+      }
+    })();
+  }, [ensureCodingChallengeSession, requireActionAuth, session?.user?.id]);
+
+  /**
+   * 处理候选人暂时不进入算法题的动作，保留当前对话但关闭确认框。
+   */
+  const handleDeclineCodingOffer = useCallback(() => {
+    setShowCodingOfferDialog(false);
+  }, []);
 
   /**
    * 使用 `keepalive` 请求补做会话结束，适用于刷新或关闭页面时的最后清理。
    * @param sessionId 当前会话 ID。
+   * @param reason 当前结束原因。
    */
   const finalizeSessionWithKeepalive = useCallback(
-    (sessionId: string) => {
+    (sessionId: string, reason: string) => {
+      const activeProfile = readStoredInterviewProfile(currentRoomKey) ?? profile;
       void fetch(`/api/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          status: "completed",
-          mode
+          status: resolveInterviewSessionStatus(reason),
+          mode,
+          roomKey: currentRoomKey,
+          planId: activeProfile?.interviewPlanId,
+          stageId: activeProfile?.interviewStageId,
+          roundId: activeProfile?.interviewRoundId,
+          sourceLaunchId: activeProfile?.launchId,
+          terminationReason: reason
         }),
         keepalive: true
       }).catch((error) => {
         console.error("Failed to finalize interview session with keepalive", error);
       });
     },
-    [mode]
+    [currentRoomKey, mode, profile]
   );
 
   /**
@@ -957,7 +2019,17 @@ function InterviewContent() {
       setProfile((current) => {
         const next = updater(current);
         if (next) {
-          writeStoredInterviewProfile(next);
+          writeStoredInterviewProfile(
+            next,
+            next.interviewRoomKey ||
+              buildInterviewRoomKey({
+                planId: next.interviewPlanId,
+                stageId: next.interviewStageId,
+                roundId: next.interviewRoundId,
+                launchId: next.launchId,
+                mode: next.mode,
+              })
+          );
         }
         return next;
       });
@@ -1132,18 +2204,82 @@ function InterviewContent() {
       stopRealtimeMedia();
       persistHistorySnapshot();
 
-      const sessionId = currentSessionIdRef.current;
+      let sessionId = currentSessionIdRef.current;
+      const activeProfile = readStoredInterviewProfile(currentRoomKey) ?? profile;
+      if (!sessionId && session?.user?.id) {
+        try {
+          const response = await fetch("/api/sessions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode,
+              status: "ongoing",
+              roomKey: currentRoomKey,
+              planId: activeProfile?.interviewPlanId || planIdFromQuery,
+              stageId: activeProfile?.interviewStageId || stageIdFromQuery,
+              roundId: activeProfile?.interviewRoundId || roundIdFromQuery,
+              sourceLaunchId: activeProfile?.launchId || initialProfile?.launchId,
+            }),
+          });
+          if (response.ok) {
+            const payload = (await response.json()) as { data?: { id?: string } };
+            sessionId = payload.data?.id?.trim() || null;
+            if (sessionId) {
+              currentSessionIdRef.current = sessionId;
+              setRoomSessionId(sessionId);
+              if (activeSessionStorageKey) {
+                writeBrowserStorageValue(activeSessionStorageKey, sessionId);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to create session before finalizing interview", error);
+        }
+      }
       if (sessionId) {
+        const completedRoundCount = countCompletedRoundsFromMessages(messagesRef.current);
+        const reportHistorySnapshot = currentRoomKey
+          ? buildHistorySnapshot({
+              sessionId,
+              roomKey: currentRoomKey,
+              planId: activeProfile?.interviewPlanId || planIdFromQuery || null,
+              stageId: activeProfile?.interviewStageId || stageIdFromQuery || null,
+              roundId: activeProfile?.interviewRoundId || roundIdFromQuery || null,
+              mode,
+              messages: messagesRef.current,
+              elapsedTime: elapsedTimeRef.current,
+              completedRounds: completedRoundCount,
+              limitType,
+              questionLimit,
+              durationLimitMinutes,
+              launchId: activeProfile?.launchId,
+              pendingAssistantReply: false,
+              thinkingStatus: thinkingStatusRef.current,
+            })
+          : null;
+        if (reportHistorySnapshot) {
+          writeBrowserStorageValue(
+            getReportHistoryStorageKey(sessionId),
+            JSON.stringify(reportHistorySnapshot)
+          );
+        }
+        const finalStatus = resolveInterviewSessionStatus(options.reason);
         if (options.keepalive) {
-          finalizeSessionWithKeepalive(sessionId);
+          finalizeSessionWithKeepalive(sessionId, options.reason);
         } else {
           try {
             await fetch(`/api/sessions/${sessionId}`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                status: "completed",
-                mode
+                status: finalStatus,
+                mode,
+                planId: activeProfile?.interviewPlanId,
+                stageId: activeProfile?.interviewStageId,
+                roundId: activeProfile?.interviewRoundId,
+                sourceLaunchId: activeProfile?.launchId,
+                roomKey: currentRoomKey,
+                terminationReason: options.reason
               })
             });
           } catch (error) {
@@ -1153,19 +2289,35 @@ function InterviewContent() {
       }
 
       if (activeSessionStorageKey) {
-        sessionStorage.removeItem(activeSessionStorageKey);
+        removeBrowserStorageValue(activeSessionStorageKey);
       }
 
       if (!options.keepalive && options.navigateToReport) {
-        router.push(sessionId ? `/report?sessionId=${sessionId}` : "/report");
+        router.push(
+          sessionId
+            ? `/report?sessionId=${sessionId}`
+            : currentRoomKey
+              ? `/report?roomKey=${encodeURIComponent(currentRoomKey)}`
+              : "/report"
+        );
       }
     },
     [
       activeSessionStorageKey,
+      currentRoomKey,
       finalizeSessionWithKeepalive,
+      durationLimitMinutes,
+      limitType,
       mode,
+      planIdFromQuery,
       persistHistorySnapshot,
+      initialProfile?.launchId,
+      profile,
+      questionLimit,
+      roundIdFromQuery,
       router,
+      session?.user?.id,
+      stageIdFromQuery,
       stopRealtimeMedia
     ]
   );
@@ -1174,27 +2326,28 @@ function InterviewContent() {
    * 在会话已建立后补写开场消息，避免只在生成报告时才真正落库。
    */
   useEffect(() => {
-    if (!session?.user?.id || messages.length === 0 || initialMessagePersistedRef.current) {
+    const activeSessionId = currentSessionIdRef.current || roomSessionId;
+    if (
+      !session?.user?.id ||
+      !activeSessionId ||
+      messages.length === 0 ||
+      initialMessagePersistedRef.current
+    ) {
       return;
     }
 
     void (async () => {
-      const sessionId = await ensureInterviewSession();
-      if (!sessionId) {
-        return;
-      }
-
       initialMessagePersistedRef.current = true;
-      await persistMessage(sessionId, "assistant", messages[0].content.join("\n"));
+      await persistMessage(activeSessionId, "assistant", messages[0].content.join("\n"));
       persistHistorySnapshot(messages, elapsedTime, completedRounds);
     })();
   }, [
     completedRounds,
     elapsedTime,
-    ensureInterviewSession,
     messages,
     persistHistorySnapshot,
     persistMessage,
+    roomSessionId,
     session?.user?.id
   ]);
 
@@ -1244,31 +2397,23 @@ function InterviewContent() {
   }, [pathname, session?.user?.id]);
 
   /**
-   * 在刷新或关闭页面时给出原生离开提示，并尽量完成最后一次会话收尾。
+   * 在刷新、断开或关闭页面时优先落盘当前进度，而不是把进行中的面试误判为已结束。
    */
   useEffect(() => {
-    if (!session?.user?.id || hasFinalizedRef.current) {
+    if (!session?.user?.id) {
       return;
     }
 
-    let unloadConfirmed = false;
-
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      unloadConfirmed = true;
-      event.preventDefault();
-      event.returnValue = "";
+      persistHistorySnapshot();
+      if (isTypingRef.current || pendingAssistantReplyRef.current) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
     };
 
     const handlePageHide = () => {
-      if (!unloadConfirmed || hasFinalizedRef.current) {
-        return;
-      }
-
-      void finalizeInterview({
-        reason: "用户关闭或刷新页面",
-        navigateToReport: false,
-        keepalive: true
-      });
+      persistHistorySnapshot();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -1278,7 +2423,7 @@ function InterviewContent() {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("pagehide", handlePageHide);
     };
-  }, [finalizeInterview, session?.user?.id]);
+  }, [persistHistorySnapshot, session?.user?.id]);
 
   /**
    * 当达到时长上限后自动结束，并补上一条结束提示消息。
@@ -1979,7 +3124,7 @@ function InterviewContent() {
       setAssistantSpeechStatus("thinking");
       abortControllerRef.current = new AbortController();
       ttsAbortControllerRef.current = new AbortController();
-      const activeProfile = readStoredInterviewProfile() ?? profile;
+      const activeProfile = readStoredInterviewProfile(currentRoomKey) ?? profile;
 
       const userMessage: InterviewMessage = {
         role: "user",
@@ -1992,19 +3137,45 @@ function InterviewContent() {
       setMessages(updatedMessages);
       setCompletedRounds(nextCompletedRounds);
       setInput("");
+      pendingAssistantReplyRef.current = true;
       setIsTyping(true);
       setIsThinking(true);
-      setThinkingStatus("面试官思考中");
+      setThinkingStatus("正在同步你的回答");
       persistHistorySnapshot(updatedMessages, elapsedTimeRef.current, nextCompletedRounds);
       await persistMessage(sessionId, "user", userMessage.content.join("\n"));
+      setThinkingStatus("面试官思考中");
+
+      let hasCommittedAssistantReply = false;
+      const handleRealtimeReplyFailure = (message: string): void => {
+        setMessages(updatedMessages);
+        persistHistorySnapshot(
+          updatedMessages,
+          elapsedTimeRef.current,
+          nextCompletedRounds
+        );
+        pendingAssistantReplyRef.current = false;
+        setLimitAlertMessage(message);
+        setShowLimitAlert(true);
+      };
 
       try {
+        const requestProfile = activeProfile
+          ? {
+              ...activeProfile,
+              interviewPlanId: planIdFromQuery || activeProfile.interviewPlanId,
+              interviewStageId: stageIdFromQuery || activeProfile.interviewStageId,
+              interviewRoundId: roundIdFromQuery || activeProfile.interviewRoundId,
+              interviewRoomKey: currentRoomKey || activeProfile.interviewRoomKey,
+            }
+          : activeProfile;
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: updatedMessages,
-            profile: activeProfile,
+            profile: requestProfile,
+            sessionId,
+            roomKey: currentRoomKey,
             mode,
             topic,
             desc,
@@ -2016,12 +3187,49 @@ function InterviewContent() {
         });
 
         if (!response.ok) {
+          const errorBody = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
           if (response.status === 403) {
-            const errorBody = (await response.json()) as { error?: string };
             setLimitAlertMessage(errorBody.error || "当前面试次数已达上限。");
             setShowLimitAlert(true);
+            return;
+          }
+          if (response.status === 409) {
+            const conflictMessage =
+              errorBody.error || "当前轮次已结束，无法继续发送新的回答。";
+            setLimitAlertMessage(conflictMessage);
+            setShowLimitAlert(true);
+            if (conflictMessage.includes("已淘汰") || conflictMessage.includes("已结束")) {
+              setAutoEnding(true);
+              await finalizeInterview({
+                reason: conflictMessage,
+                navigateToReport: true,
+              });
+              return;
+            }
           }
           throw new Error("Failed to stream interview response");
+        }
+
+        const interviewAction = response.headers.get("x-interview-action") || "continue";
+        const interviewActionReason = decodeInterviewHeaderValue(
+          response.headers.get("x-interview-action-reason")
+        );
+        const existingCodingSessionId =
+          response.headers.get("x-coding-session-id") || "";
+        if (existingCodingSessionId) {
+          setProfile((current) => {
+            if (!current) {
+              return current;
+            }
+            const nextProfile = {
+              ...current,
+              codingSessionId: existingCodingSessionId,
+            };
+            writeStoredInterviewProfile(nextProfile, nextProfile.interviewRoomKey);
+            return nextProfile;
+          });
         }
 
         const reader = response.body?.getReader();
@@ -2033,6 +3241,11 @@ function InterviewContent() {
           tag: ""
         };
         setMessages((current) => [...current, placeholderMessage]);
+        persistHistorySnapshot(
+          [...updatedMessages, placeholderMessage],
+          elapsedTimeRef.current,
+          nextCompletedRounds
+        );
 
         let fullText = "";
         let processedTextLength = 0;
@@ -2066,7 +3279,7 @@ function InterviewContent() {
                 setThinkingStatus("进一步检索资料中");
               }
               if (parsedChunk.generating) {
-                setThinkingStatus("面试官思考中");
+                setThinkingStatus("正在生成下一轮追问");
               }
 
               const textChunk = parsedChunk.content;
@@ -2141,10 +3354,37 @@ function InterviewContent() {
             nextCompletedRounds
           );
           await persistMessage(sessionId, "assistant", finalizedAiText);
+          pendingAssistantReplyRef.current = false;
+          hasCommittedAssistantReply = true;
           clearRealtimeInterruptionContext();
           if (!isRealtimeMode) {
             setAssistantSpeechStatus("idle");
           }
+
+          if (interviewAction === "end_interview") {
+            setAutoEnding(true);
+            await finalizeInterview({
+              reason: interviewActionReason || "候选人连续低信息量回答，面试官主动结束本轮",
+              navigateToReport: true,
+            });
+          }
+
+          if (interviewAction === "offer_coding") {
+            setCodingOfferReason(
+              interviewActionReason || "候选人已达到算法题触发阈值"
+            );
+            setShowCodingOfferDialog(true);
+          }
+        }
+
+        if (
+          !hasCommittedAssistantReply &&
+          !isInterruptedRef.current &&
+          assistantTurnIdRef.current === assistantTurnId
+        ) {
+          handleRealtimeReplyFailure(
+            "这一轮没有拿到新的实时追问，系统没有使用本地预生成兜底。请重新发送一次，我会重新走实时 Agent 链。"
+          );
         }
 
         if (questionLimit && nextCompletedRounds >= questionLimit) {
@@ -2157,6 +3397,15 @@ function InterviewContent() {
       } catch (error) {
         if (!isAbortError(error)) {
           console.error("Failed to send interview message", error);
+          if (
+            !hasCommittedAssistantReply &&
+            !isInterruptedRef.current &&
+            assistantTurnIdRef.current === assistantTurnId
+          ) {
+            handleRealtimeReplyFailure(
+              "这一轮请求失败，系统没有使用本地预生成兜底。请重新发送一次，我会重新走实时 Agent 链。"
+            );
+          }
         }
       } finally {
         if (assistantTurnIdRef.current === assistantTurnId) {
@@ -2187,11 +3436,15 @@ function InterviewContent() {
       mode,
       persistHistorySnapshot,
       persistMessage,
+      planIdFromQuery,
       profile,
+      currentRoomKey,
       questionLimit,
       queueTts,
+      roundIdFromQuery,
       requireActionAuth,
       session?.user?.id,
+      stageIdFromQuery,
       topic
     ]
   );
@@ -2208,21 +3461,24 @@ function InterviewContent() {
   }, [handleSendMessage, input]);
 
   /**
-   * 处理快捷动作“跳过本题”。
+   * 处理快捷动作“跳过本题”，先填入草稿，保留用户修改空间。
    */
   const handleSkip = useCallback(() => {
-    void handleSendMessage("这道题我不太清楚，我们可以跳过吗？", "跳过本题");
-  }, [handleSendMessage]);
+    setInput("这道题我暂时没有把握，我想先跳过这一题。");
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, []);
 
   /**
-   * 处理快捷动作“我不知道”。
+   * 处理快捷动作“我不知道”，先填入草稿，保留用户修改空间。
    */
   const handleIdk = useCallback(() => {
-    void handleSendMessage(
-      "这个问题我暂时回答不上来，请先给我一点提示，再继续追问。",
-      "我不知道"
-    );
-  }, [handleSendMessage]);
+    setInput("这个问题我暂时回答不上来，能先给我一点提示或者换个角度引导我吗？");
+    window.requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, []);
 
   /**
    * 处理输入框回车发送逻辑，同时兼容中文输入法组合态。
@@ -2572,6 +3828,79 @@ function InterviewContent() {
         </div>
       ) : null}
 
+      {showCodingOfferDialog ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 240,
+            display: "grid",
+            placeItems: "center",
+            backgroundColor: "rgba(20, 20, 19, 0.42)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <div
+            style={{
+              width: "min(92vw, 560px)",
+              padding: "2rem",
+              borderRadius: "24px",
+              backgroundColor: "rgba(255, 255, 255, 0.98)",
+              border: "1px solid rgba(20,20,19,0.08)",
+              boxShadow: "0 28px 70px rgba(20,20,19,0.15)",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0.4rem 0.72rem",
+                borderRadius: "999px",
+                backgroundColor: "rgba(106, 155, 204, 0.1)",
+                color: "var(--accent-blue)",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+              }}
+            >
+              算法题触发
+            </div>
+            <h3 style={{ margin: "1rem 0 0.7rem 0" }}>进入限时算法题吗？</h3>
+            <p style={{ marginBottom: "1.1rem", color: "rgba(20,20,19,0.72)", lineHeight: 1.7 }}>
+              前面的项目问答已经达到当前轮次的算法题触发阈值。接下来会进入一个独立的限时编码环节，重点看你的编码表达、边界处理和基本功。
+            </p>
+            <p style={{ marginBottom: "1.5rem", color: "rgba(20,20,19,0.6)", lineHeight: 1.7 }}>
+              触发原因：{codingOfferReason || "当前回答表现积极，已达到转入算法题条件。"}
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.75rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleDeclineCodingOffer}
+                disabled={codingBusy}
+              >
+                稍后再说
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleAcceptCodingOffer}
+                disabled={codingBusy}
+              >
+                {codingBusy ? "正在进入..." : "开始算法题"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {!isRealtimeMode ? (
         <div
           style={{
@@ -2699,6 +4028,24 @@ function InterviewContent() {
                 gap: "1.5rem"
               }}
             >
+              {codingSession ? (
+                <div
+                  style={{
+                    padding: "1.2rem 1.3rem",
+                    borderRadius: "24px",
+                    border: "1px solid rgba(20,20,19,0.08)",
+                    backgroundColor: "rgba(255,255,255,0.96)",
+                    boxShadow: "0 14px 32px rgba(20,20,19,0.06)",
+                  }}
+                >
+                  <strong style={{ display: "block", marginBottom: "0.45rem" }}>
+                    正在切换到独立算法题页面
+                  </strong>
+                  <span style={{ color: "var(--text-muted)", lineHeight: 1.7 }}>
+                    当前轮次已进入代码作答环节，系统正在跳转到独立的编程页面，避免题面和聊天区域混在同一屏。
+                  </span>
+                </div>
+              ) : null}
               {messages.map((message, index) => (
                 <div
                   key={`${message.role}-${message.time}-${index}`}
@@ -2766,7 +4113,7 @@ function InterviewContent() {
                     <div
                       className={`interview-message__body ${message.role === "user" ? "is-user" : "is-ai"}`}
                     >
-                      {message.tag ? (
+                      {message.role === "user" && message.tag ? (
                         <div
                           style={{
                             display: "inline-flex",
@@ -2783,7 +4130,11 @@ function InterviewContent() {
                         </div>
                       ) : null}
                       <div
-                        className={`markdown-body interview-markdown ${message.role === "user" ? "is-user" : "is-ai"}`}
+                        className={`markdown-body interview-markdown ${message.role === "user" ? "is-user" : "is-ai"} ${
+                          isTyping && latestAiMessageIndex === index && message.role === "ai"
+                            ? "is-streaming"
+                            : ""
+                        }`}
                       >
                         {message.role === "ai" ? (
                           <>
@@ -2826,17 +4177,10 @@ function InterviewContent() {
 
               {isThinking ? (
                 <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                  <div
-                    style={{
-                      padding: "0.72rem 0.92rem",
-                      borderRadius: "999px",
-                      backgroundColor: "rgba(20,20,19,0.04)",
-                      color: "var(--text-muted)",
-                      fontSize: "0.84rem"
-                    }}
-                  >
-                    {thinkingStatus}
-                  </div>
+                  <ThinkingBubble
+                    status={thinkingStatus}
+                    hint={getThinkingStatusHint(thinkingStatus)}
+                  />
                 </div>
               ) : null}
               <div ref={chatBottomRef} aria-hidden="true" />
@@ -2876,9 +4220,13 @@ function InterviewContent() {
                     isComposingRef.current = false;
                   }, 300);
                 }}
-                disabled={isTyping || autoEnding}
+                disabled={isTyping || autoEnding || Boolean(codingSession)}
                 rows={1}
-                placeholder="输入你的回答，按 Enter 发送，Shift + Enter 换行"
+                placeholder={
+                  codingSession
+                    ? "当前已进入算法题环节，请在上方代码编辑区完成作答"
+                    : "输入你的回答，按 Enter 发送，Shift + Enter 换行"
+                }
                 style={{
                   width: "100%",
                   minHeight: "52px",
@@ -2903,26 +4251,28 @@ function InterviewContent() {
                   flexWrap: "wrap"
                 }}
               >
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleSkip}
-                    disabled={isTyping || autoEnding}
-                    style={{ height: "44px", padding: "0 1rem", fontSize: "0.9rem" }}
-                  >
-                    跳过本题
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleIdk}
-                    disabled={isTyping || autoEnding}
-                    style={{ height: "44px", padding: "0 1rem", fontSize: "0.9rem" }}
-                  >
-                    我不知道
-                  </button>
-                </div>
+                {codingSession ? <div /> : (
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleSkip}
+                      disabled={isTyping || autoEnding}
+                      style={{ height: "44px", padding: "0 1rem", fontSize: "0.9rem" }}
+                    >
+                      跳过本题
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleIdk}
+                      disabled={isTyping || autoEnding}
+                      style={{ height: "44px", padding: "0 1rem", fontSize: "0.9rem" }}
+                    >
+                      我不知道
+                    </button>
+                  </div>
+                )}
                 <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
                   <button
                     type="button"
@@ -2937,7 +4287,7 @@ function InterviewContent() {
                     type="button"
                     className="btn btn-primary"
                     onClick={handleSend}
-                    disabled={!input.trim() || isTyping || autoEnding}
+                    disabled={!input.trim() || isTyping || autoEnding || Boolean(codingSession)}
                     style={{ height: "44px", padding: "0 1.15rem", fontSize: "0.9rem" }}
                   >
                     发送回答

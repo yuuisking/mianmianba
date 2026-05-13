@@ -1,10 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthDialog } from "@/components/auth/AuthDialogProvider";
 import {
+  buildInterviewRoomKey,
   buildInterviewLimitStrategy,
   createInterviewLaunchId,
   normalizeInterviewMode,
@@ -12,17 +14,32 @@ import {
   writeStoredInterviewProfile,
   type InterviewProfileState
 } from "@/lib/interview/config";
+import {
+  findCompanyPlaybook,
+  getCompanyExperienceThemes
+} from "@/lib/interview-v2/companyPlaybooks";
+import type { InterviewPlanCreationResultV2 } from "@/lib/interview-v2/domain";
 
 /**
  * 从浏览器会话缓存中读取已解析的画像数据，避免刷新后丢失当前步骤上下文。
  * @returns 解析结果以及默认展示用的岗位与训练重点。
  */
-function readStoredProfileState(): {
+function readStoredProfileState(input: {
+  launchId: string;
+  mode: InterviewProfileState["mode"];
+}): {
   parsedData: InterviewProfileState | null;
   role: string;
   focus: string;
 } {
-  const parsed = readStoredInterviewProfile();
+  const parsed = input.launchId
+    ? readStoredInterviewProfile(
+        buildInterviewRoomKey({
+          launchId: input.launchId,
+          mode: input.mode,
+        })
+      )
+    : null;
   return {
     parsedData: parsed,
     role: parsed?.role?.trim() || "",
@@ -63,18 +80,50 @@ function ProfileContent() {
   const { data: session } = useSession();
   const { requestAuth } = useAuthDialog();
   const mode = normalizeInterviewMode(searchParams.get("mode") || "text");
+  const launchIdFromQuery = searchParams.get("launchId") || "";
 
-  const initialState = readStoredProfileState();
+  const initialState = readStoredProfileState({
+    launchId: launchIdFromQuery,
+    mode,
+  });
   const [parsedData] = useState<InterviewProfileState | null>(initialState.parsedData);
   const [role, setRole] = useState(initialState.role);
-  const [focus, setFocus] = useState(initialState.focus);
-  const [isResolvingRole, setIsResolvingRole] = useState(false);
+  const [focus] = useState(initialState.focus || "综合面试");
+  const [, setIsResolvingRole] = useState(false);
+  const [isCreatingPlan, setIsCreatingPlan] = useState(false);
+  const [planCreationError, setPlanCreationError] = useState("");
   const [roleAssistText, setRoleAssistText] = useState(
     initialState.role ? "已根据简历自动识别岗位，你可以继续修改。" : ""
   );
   const roleEditedRef = useRef(false);
   const roleResolvedRef = useRef(Boolean(initialState.role));
-  const canEnterRoom = Boolean(parsedData && role.trim());
+  const canEnterRoom = Boolean(parsedData && role.trim() && !isCreatingPlan);
+  const launchFlowMode = parsedData?.launchFlowMode ?? "stage";
+  const templateLabel = parsedData?.interviewTemplateLabel?.trim() || "未选择模板";
+  const launchRoleName = parsedData?.targetRoleName?.trim() || role.trim();
+  const flowSummary =
+    launchFlowMode === "full_flow"
+      ? "本次会先确认你的岗位画像，再按公司和岗位上下文生成多轮面试计划。"
+      : "本次会先确认你的岗位画像，再进入单场高强度模拟。";
+  const interviewModeLabel =
+    parsedData?.displayInterviewModeLabel?.trim() ||
+    (mode === "realtime"
+      ? parsedData?.videoEnabled
+        ? "视频面试"
+        : "实时面试"
+      : "文字面试");
+  const matchedCompanyPlaybook = useMemo(
+    () => findCompanyPlaybook(parsedData?.companyName || ""),
+    [parsedData?.companyName]
+  );
+  const companyExperienceThemes = useMemo(
+    () =>
+      getCompanyExperienceThemes(
+        parsedData?.companyName || "",
+        parsedData?.targetRoleName || parsedData?.role || role
+      ),
+    [parsedData?.companyName, parsedData?.role, parsedData?.targetRoleName, role]
+  );
   const limitStrategy = useMemo(
     () =>
       buildInterviewLimitStrategy(
@@ -140,22 +189,90 @@ function ProfileContent() {
   }, [parsedData, role]);
 
   /**
-   * 在已登录状态下进入面试房间，并保留当前确认后的岗位与训练重点。
-   * @returns 无返回值，成功后跳转到面试页。
+   * 创建真实的 v2 面试计划，并把计划/轮次信息写回本地会话上下文。
+   * @returns {Promise<void>} 创建完成后进入对应面试房间。
    */
-  const enterRoom = () => {
+  const createPlanAndEnterRoom = async (): Promise<void> => {
     if (!parsedData || !role.trim()) {
       return;
     }
 
-    writeStoredInterviewProfile({
-      ...parsedData,
-      launchId: createInterviewLaunchId(),
-      role: role.trim(),
-      focus,
-      mode
-    });
-    router.push(`/interview?mode=${mode}`);
+    setIsCreatingPlan(true);
+    setPlanCreationError("");
+
+    try {
+      const response = await fetch("/api/v2/interview-plans", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          launchId: parsedData.launchId || createInterviewLaunchId(),
+          launchFlowMode,
+          companyName: parsedData.companyName || "",
+          roleName: role.trim(),
+          targetLevel: parsedData.targetLevel || "",
+          language: parsedData.language || "",
+          focus,
+          mode,
+          interviewTemplateId: parsedData.interviewTemplateId || "",
+          interviewTemplateLabel: parsedData.interviewTemplateLabel || "",
+          interviewIntensity: parsedData.interviewIntensity || "",
+          jdText: parsedData.jdText || "",
+          resumeText: parsedData.resumeSummaryMarkdown || "",
+          persona: parsedData.persona,
+          projects: parsedData.projects || [],
+          limitType: parsedData.limitType || "none",
+          questionLimit: parsedData.questionLimit ?? null,
+          durationLimitMinutes: parsedData.durationLimitMinutes ?? null
+        })
+      });
+
+      const payload = (await response.json()) as {
+        data?: InterviewPlanCreationResultV2;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.error || "创建面试计划失败，请稍后重试。");
+      }
+
+      const launchId = parsedData.launchId || createInterviewLaunchId();
+      const nextProfile = {
+        ...parsedData,
+        launchId,
+        interviewPlanId: payload.data.planId,
+        interviewStageId: payload.data.initialStageId || undefined,
+        interviewRoundId: payload.data.initialRoundId || undefined,
+        role: role.trim(),
+        focus,
+        mode
+      };
+      writeStoredInterviewProfile(
+        nextProfile,
+        buildInterviewRoomKey({
+          planId: nextProfile.interviewPlanId,
+          stageId: nextProfile.interviewStageId,
+          roundId: nextProfile.interviewRoundId,
+          launchId,
+          mode,
+        })
+      );
+
+      const actionPath =
+        payload.data.initialActionPath || `/interview?mode=${mode}&planId=${payload.data.planId}`;
+      const separator = actionPath.includes("?") ? "&" : "?";
+      router.push(`${actionPath}${separator}mode=${mode}`);
+    } catch (error) {
+      console.error("Failed to create interview plan", error);
+      setPlanCreationError(
+        error instanceof Error ? error.message : "创建面试计划失败，请稍后重试。"
+      );
+      setIsCreatingPlan(false);
+      return;
+    }
+
+    setIsCreatingPlan(false);
   };
 
   /**
@@ -168,7 +285,7 @@ function ProfileContent() {
     }
 
     if (session?.user?.id) {
-      enterRoom();
+      void createPlanAndEnterRoom();
       return;
     }
 
@@ -176,7 +293,9 @@ function ProfileContent() {
       title: "登录后进入面试房间",
       description: "登录后即可继续进入当前面试流程。",
       callbackUrl: "/profile",
-      onSuccess: enterRoom
+      onSuccess: () => {
+        void createPlanAndEnterRoom();
+      }
     });
   };
 
@@ -193,343 +312,321 @@ function ProfileContent() {
     );
   }
 
+  const personaStrengths = (parsedData.persona?.strengths || []).filter(Boolean);
+  const personaRisks = (parsedData.persona?.risks || []).filter(Boolean);
+  const resumeImprovements = (parsedData.resumeImprovements || []).filter(Boolean);
+  const projectHighlights = (parsedData.projects || []).filter((item) => item.name || item.points);
+  const candidateName = session?.user?.name?.trim() || "候选人";
+  const candidateSummaryParts = [
+    launchRoleName || "待确认岗位",
+    parsedData.targetLevel?.trim() || "待确认职级",
+    parsedData.companyName?.trim() || "",
+  ].filter(Boolean);
+  const matchScore = Math.max(
+    72,
+    Math.min(
+      88,
+      80 +
+        Math.min(personaStrengths.length, 4) * 2 -
+        Math.min(personaRisks.length + resumeImprovements.length, 4)
+    )
+  );
+  const coreTags = Array.from(
+    new Set([
+      ...personaStrengths,
+      ...companyExperienceThemes.map((item) => item.label),
+      parsedData.interviewIntensity?.trim() || "",
+      interviewModeLabel,
+    ].filter(Boolean))
+  ).slice(0, 6);
+  const advantageItems =
+    (personaStrengths.length > 0
+      ? personaStrengths.map((item) => ({
+          title: item,
+          desc: `系统已从真实简历和岗位语境中提取出这项优势，会在后续问答中优先验证其真实性与深度。`,
+        }))
+      : projectHighlights.map((item) => ({
+          title: item.name,
+          desc: item.points,
+        }))).slice(0, 4);
+  const riskItems = [...personaRisks, ...resumeImprovements].slice(0, 4);
+  const strategyTags = [
+    `重点模块：${focus || "综合评估"}`,
+    `追问风格：${matchedCompanyPlaybook?.interviewStyle || "结构化追问"}`,
+    `评估维度：${launchFlowMode === "full_flow" ? "多轮计划 / 阶段推进 / 岗位匹配" : "技术深度 / 工程实践 / 表达稳定度"}`,
+  ];
+  const candidatePortraitUrl = "/interview/reference-candidate.png";
+  const analystPortraitUrl = "/interview/reference-analyst.png";
+  const analysisSummary =
+    parsedData.jdGapWarning?.strategy?.trim() ||
+    "围绕岗位核心能力、工程实践与表达稳定度做画像确认，进入面试后继续用真实问答校验简历可信度。";
+  const highlightModules =
+    companyExperienceThemes.length > 0
+      ? Array.from(new Set(companyExperienceThemes.map((item) => item.focus))).slice(0, 2).join(" / ")
+      : focus || "综合评估";
+  const strategyRows = [
+    {
+      label: "当前模板",
+      value: templateLabel,
+    },
+    {
+      label: "自动结束策略",
+      value: limitStrategy.summary,
+    },
+    {
+      label: "面试官风格",
+      value: matchedCompanyPlaybook?.interviewStyle || "结构化追问",
+    },
+    {
+      label: "重点模块",
+      value: highlightModules,
+    },
+    {
+      label: "评估维度",
+      value:
+        launchFlowMode === "full_flow"
+          ? "多轮推进 / 岗位匹配 / 阶段表现"
+          : "技术深度 / 工程实践 / 表达稳定度",
+    },
+  ];
+
   return (
-    <section
-      id="view-profile"
-      className="view active"
-      style={{
-        padding: "1.6rem 2rem",
-        backgroundColor: "var(--bg-main)",
-        minHeight: "calc(100vh - 70px)"
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1160px",
-          margin: "0 auto",
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          gap: "1.35rem"
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "1rem",
-            flexWrap: "wrap"
-          }}
-        >
-          <div>
-            <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "1.6rem", color: "var(--text-dark)", margin: 0 }}>
-              确认面试岗位
-            </h1>
-            <p style={{ fontFamily: "var(--font-body)", color: "var(--text-muted)", fontSize: "0.95rem", margin: "0.25rem 0 0 0" }}>
-              页面只保留本场真正有用的信息，简历摘要已经回到上传区文本框中维护。
-            </p>
+    <section id="view-profile" className="view active launch-ref-profile-view">
+      <div className="launch-ref-profile-page">
+        <div className="launch-ref-profile-container">
+          <div className="launch-ref-profile-steps" data-source="profile-stepper">
+            {[
+              { no: "✓", title: "面试配置", sub: "已完成", status: "done" },
+              { no: "✓", title: "本场预览", sub: "已完成", status: "done" },
+              { no: "3", title: "用户画像", sub: isCreatingPlan ? "正在创建计划..." : "AI 已完成画像", status: "active" },
+              { no: "4", title: "进入面试间", sub: "待开始", status: "pending" },
+            ].map((item, index) => (
+              <div
+                key={item.title}
+                className={`launch-ref-profile-step launch-ref-profile-step--${item.status}`}
+              >
+                <span className="launch-ref-profile-step-circle">{item.no}</span>
+                <div className="launch-ref-profile-step-copy">
+                  <div className="launch-ref-profile-step-title">{item.title}</div>
+                  <div className="launch-ref-profile-step-sub">{item.sub}</div>
+                </div>
+                {index < 3 ? <span className="launch-ref-profile-step-arrow">›</span> : null}
+              </div>
+            ))}
           </div>
 
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              backgroundColor: "var(--bg-surface)",
-              border: "1px solid var(--border-color)",
-              borderRadius: "30px",
-              padding: "0.4rem 1rem",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.02)",
-              width: "320px"
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            <input
-              type="text"
-              value={role}
-              onChange={(e) => {
-                roleEditedRef.current = true;
-                setRole(e.target.value);
-                setRoleAssistText("岗位支持手动修改，进入面试时将以这里的内容为准。");
-              }}
-              placeholder="例如：Java 后端开发工程师"
-              style={{
-                border: "none",
-                outline: "none",
-                background: "transparent",
-                fontSize: "1rem",
-                fontFamily: "var(--font-ui)",
-                fontWeight: 500,
-                color: "var(--accent-orange)",
-                width: "100%",
-                padding: "0 0.75rem",
-                textAlign: "center"
-              }}
-            />
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-            </svg>
-          </div>
-          <div
-            style={{
-              width: "100%",
-              display: "flex",
-              justifyContent: "flex-end"
-            }}
-          >
-            <span
-              style={{
-                fontSize: "0.82rem",
-                color: isResolvingRole ? "var(--accent-orange)" : "var(--text-muted)",
-                lineHeight: 1.6
-              }}
-            >
-              {roleAssistText || "系统会优先根据真实简历自动识别岗位，你也可以手动修改。"}
-            </span>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1.08fr) minmax(320px, 0.92fr)",
-            gap: "1.2rem",
-            alignItems: "start"
-          }}
-        >
-          <div style={{ display: "grid", gap: "1.2rem" }}>
-            <div
-              style={{
-                backgroundColor: "rgba(217, 119, 87, 0.03)",
-                padding: "1.35rem 1.45rem",
-                borderRadius: "18px",
-                border: "1px solid rgba(217, 119, 87, 0.16)"
-              }}
-            >
-              <h3 style={{ margin: "0 0 0.9rem 0", fontFamily: "var(--font-heading)", fontSize: "1.05rem", color: "var(--accent-orange)" }}>
-                岗位匹配提醒和优化建议
-              </h3>
-              <div style={{ display: "grid", gap: "0.8rem" }}>
-                <p style={{ margin: 0, color: "var(--text-dark)", lineHeight: 1.8 }}>
-                  {parsedData.jdGapWarning?.text?.trim() || "当前没有额外的岗位匹配风险提醒，后续会继续根据真实对话动态判断。"}
-                </p>
-                <div
-                  style={{
-                    padding: "0.85rem 1rem",
-                    borderRadius: "14px",
-                    backgroundColor: "rgba(255,255,255,0.84)",
-                    border: "1px solid rgba(217, 119, 87, 0.1)",
-                    color: "var(--text-muted)",
-                    fontSize: "0.88rem",
-                    lineHeight: 1.7
-                  }}
-                >
-                  <strong style={{ color: "var(--accent-orange)" }}>优化建议：</strong>{" "}
-                  {parsedData.jdGapWarning?.strategy?.trim() || "当前没有额外的匹配优化建议，你也可以用下方重点输入继续收口本场方向。"}
+          <div className="launch-ref-profile-layout" data-source="profile-content">
+            <section className="launch-ref-profile-panel launch-ref-profile-panel--candidate">
+              <div className="launch-ref-profile-panel-head">
+                <h2>候选人画像 ✨</h2>
+              </div>
+              <div className="launch-ref-profile-hero">
+                <div className="launch-ref-profile-hero-photo">
+                  <Image
+                    src={candidatePortraitUrl}
+                    alt="候选人画像"
+                    width={160}
+                    height={160}
+                    className="launch-ref-profile-hero-image"
+                  />
+                </div>
+                <div className="launch-ref-profile-hero-copy">
+                  <div className="launch-ref-profile-name-row">
+                    <div className="launch-ref-profile-name">{candidateName}</div>
+                    <span className="launch-ref-profile-name-badge">已识别</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={role}
+                    onChange={(event) => {
+                      roleEditedRef.current = true;
+                      setRole(event.target.value);
+                      setRoleAssistText("岗位支持手动修改，进入面试时将以这里的内容为准。");
+                    }}
+                    className="launch-ref-profile-role-input"
+                    placeholder="请输入目标岗位"
+                  />
+                  <p className="launch-ref-profile-meta-line">
+                    {launchRoleName || "待确认岗位"}
+                  </p>
+                  <p className="launch-ref-profile-meta-line">
+                    {candidateSummaryParts.join(" · ") || "待补充候选人信息"}
+                  </p>
+                  <p className="launch-ref-profile-meta-line">
+                    {launchFlowMode === "full_flow" ? "全流程面试" : "阶段面试"} · {interviewModeLabel}
+                  </p>
+                  <p className="launch-ref-profile-meta-tip">
+                    {roleAssistText || "系统会优先根据真实简历自动识别岗位。"}
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <div
-              style={{
-                backgroundColor: "var(--bg-surface)",
-                padding: "1.35rem 1.45rem",
-                borderRadius: "18px",
-                border: "1px solid var(--border-color)"
-              }}
-            >
-              <h3 style={{ margin: "0 0 0.9rem 0", fontFamily: "var(--font-heading)", fontSize: "1.05rem", color: "var(--text-dark)" }}>
-                简历可优化点
-              </h3>
-              {(parsedData.resumeImprovements || []).length > 0 ? (
-                <div style={{ display: "grid", gap: "0.7rem" }}>
-                  {(parsedData.resumeImprovements || []).map((item, index) => (
-                    <div
-                      key={`resume-improvement-${index}`}
-                      style={{
-                        padding: "0.9rem 1rem",
-                        borderRadius: "14px",
-                        backgroundColor: "rgba(106, 155, 204, 0.04)",
-                        border: "1px solid rgba(106, 155, 204, 0.12)",
-                        color: "var(--text-dark)",
-                        lineHeight: 1.75
-                      }}
-                    >
-                      {item}
+              <div className="launch-ref-profile-score-card">
+                <div className="launch-ref-profile-score-ring">
+                  <div className="launch-ref-profile-score-ring-inner">
+                    <strong>{matchScore}</strong>
+                    <span>分</span>
+                    <small>综合匹配度</small>
+                  </div>
+                </div>
+                <div className="launch-ref-profile-score-copy">
+                  <p>{flowSummary}</p>
+                  <p>
+                    {parsedData.jdGapWarning?.text?.trim()
+                      ? `当前提醒：${parsedData.jdGapWarning.text.trim()}`
+                      : "当前没有额外的岗位匹配风险提醒。"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="launch-ref-profile-tag-section">
+                <h3>核心标签</h3>
+                <div className="launch-ref-profile-tag-list">
+                  {coreTags.length > 0 ? (
+                    coreTags.map((item) => (
+                      <span key={item} className="launch-ref-profile-tag">
+                        {item}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="launch-ref-profile-tag">综合评估</span>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="launch-ref-profile-panel launch-ref-profile-panel--highlights">
+              <div className="launch-ref-profile-panel-head">
+                <h2>👍 优势亮点</h2>
+              </div>
+              <div className="launch-ref-profile-highlight-list">
+                {advantageItems.length > 0 ? (
+                  advantageItems.map((item, index) => (
+                    <div key={item.title} className="launch-ref-profile-highlight-item">
+                      <span className="launch-ref-profile-highlight-icon">
+                        {["<>", "▤", "⚡", "⌁"][index] || "⌘"}
+                      </span>
+                      <div>
+                        <div className="launch-ref-profile-highlight-title">{item.title}</div>
+                        <div className="launch-ref-profile-highlight-desc">{item.desc}</div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="launch-ref-profile-highlight-item">
+                    <span className="launch-ref-profile-highlight-icon">⌘</span>
+                    <div>
+                      <div className="launch-ref-profile-highlight-title">等待更多亮点信息</div>
+                      <div className="launch-ref-profile-highlight-desc">
+                        当前已完成基础画像生成，进入面试后会继续结合真实问答补充优势判断。
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="launch-ref-profile-risk-block">
+                <h2>⚠ 风险提醒 / 待补强点</h2>
+                <div className="launch-ref-profile-risk-list">
+                  {riskItems.length > 0 ? (
+                    riskItems.map((item) => (
+                      <div key={item} className="launch-ref-profile-risk-item">
+                        <span>{item}</span>
+                        <span className="launch-ref-profile-risk-status">待补强</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="launch-ref-profile-risk-item">
+                      <span>当前没有额外的补强风险，后续会继续根据真实问答动态判断。</span>
+                      <span className="launch-ref-profile-risk-status">观察中</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <div className="launch-ref-profile-side">
+              <section className="launch-ref-profile-panel launch-ref-profile-panel--strategy">
+                <div className="launch-ref-profile-panel-head">
+                  <h2>🎯 本场策略</h2>
+                </div>
+                <div className="launch-ref-profile-strategy-table">
+                  {strategyRows.map((item) => (
+                    <div key={item.label} className="launch-ref-profile-strategy-row">
+                      <div className="launch-ref-profile-strategy-label">{item.label}</div>
+                      <div className="launch-ref-profile-strategy-value">{item.value}</div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <p style={{ margin: 0, color: "var(--text-muted)", lineHeight: 1.7 }}>
-                  当前没有额外的简历可优化点，后续会继续结合真实问答补充建议。
-                </p>
-              )}
+              </section>
+
+              <section className="launch-ref-profile-panel launch-ref-profile-panel--analysis">
+                <div className="launch-ref-profile-panel-head">
+                  <h2>✨ AI 解析结论</h2>
+                </div>
+                <div className="launch-ref-profile-analysis-card">
+                  <Image
+                    src={analystPortraitUrl}
+                    alt="AI 分析师头像"
+                    width={56}
+                    height={56}
+                    className="launch-ref-profile-analysis-image"
+                  />
+                  <div>
+                    <strong>AI 分析师 · 小面</strong>
+                    <div className="launch-ref-profile-analysis-subtitle">
+                      基于候选人简历与岗位模型生成
+                    </div>
+                    <p>{analysisSummary}</p>
+                  </div>
+                </div>
+                {companyExperienceThemes.length > 0 ? (
+                  <div className="launch-ref-profile-analysis-topics">
+                    {companyExperienceThemes.slice(0, 3).map((item) => (
+                      <div
+                        key={`${item.stageType}-${item.label}`}
+                        className="launch-ref-profile-analysis-topic"
+                      >
+                        <div className="launch-ref-profile-analysis-topic-head">
+                          <strong>{item.label}</strong>
+                          <span className="launch-ref-profile-analysis-topic-badge">
+                            {item.stageType}
+                          </span>
+                        </div>
+                        <p>{item.focus}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
             </div>
           </div>
 
-          <div style={{ display: "grid", gap: "1.2rem" }}>
-            <div
-              style={{
-                backgroundColor: "rgba(106, 155, 204, 0.04)",
-                padding: "1.35rem 1.45rem",
-                borderRadius: "18px",
-                border: "1px solid rgba(106, 155, 204, 0.16)"
-              }}
-            >
-              <h3 style={{ margin: "0 0 0.9rem 0", fontFamily: "var(--font-heading)", fontSize: "1.05rem", color: "var(--accent-blue)" }}>
-                本场策略
-              </h3>
-              <div
-                style={{
-                  padding: "0.9rem 1rem",
-                  borderRadius: "14px",
-                  backgroundColor: "rgba(255,255,255,0.86)",
-                  border: "1px solid rgba(106, 155, 204, 0.12)",
-                  marginBottom: "0.85rem"
-                }}
+          <footer className="launch-ref-profile-summary-bar" data-source="profile-footer">
+            <div className="launch-ref-profile-summary-copy">
+              <div className="launch-ref-profile-summary-title">策略摘要</div>
+              <p>{planCreationError || analysisSummary}</p>
+              <div className="launch-ref-profile-summary-tags">
+                {strategyTags.map((item) => (
+                  <span key={item} className="launch-ref-profile-summary-tag">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="launch-ref-profile-summary-actions">
+              <button className="launch-ref-profile-btn launch-ref-profile-btn--ghost" onClick={() => router.push("/setup")}>
+                返回修改
+              </button>
+              <button
+                className="launch-ref-profile-btn launch-ref-profile-btn--primary"
+                onClick={handleEnterRoom}
+                disabled={!canEnterRoom}
               >
-                <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>自动结束策略</div>
-                <div style={{ fontWeight: 600, color: "var(--text-dark)" }}>{limitStrategy.summary}</div>
-              </div>
-              <div style={{ color: "var(--text-dark)", lineHeight: 1.8, fontSize: "0.9rem" }}>
-                {mode === "targeted"
-                  ? "当前将进入专项训练。本场会围绕你确认后的岗位和重点持续深挖，由你主动结束。"
-                  : mode === "realtime"
-                    ? "当前将进入实时面试。默认以音频开始，进入房间后可以随时打开或关闭视频。"
-                    : "当前将进入文字面试。系统会按你设定的单一上限自然收束，不会额外扩大提问范围。"}
-              </div>
+                {launchFlowMode === "full_flow" ? "确认画像并创建计划 →" : "确认画像并进入面试间 →"}
+              </button>
             </div>
-
-            <div
-              style={{
-                backgroundColor: "var(--bg-surface)",
-                padding: "1rem 1.15rem",
-                borderRadius: "16px",
-                border: "1px dashed var(--border-strong)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.7rem"
-              }}
-            >
-              <h3 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: "1rem", color: "var(--text-dark)" }}>
-                手动补充训练侧重点
-              </h3>
-              <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: 1.65 }}>
-                这里可以补充你希望本场重点练的方向，AI 会优先围绕这些真实重点继续发问。
-              </p>
-              <textarea
-                value={focus}
-                onChange={(e) => setFocus(e.target.value)}
-                placeholder="例如：我想重点练项目深挖，或者请多追问系统设计取舍..."
-                style={{
-                  width: "100%",
-                  minHeight: "110px",
-                  fontSize: "0.92rem",
-                  fontFamily: "var(--font-ui)",
-                  backgroundColor: "var(--bg-main)",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "12px",
-                  padding: "0.9rem",
-                  color: "var(--text-dark)",
-                  outline: "none",
-                  resize: "vertical",
-                  lineHeight: 1.6
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = "var(--accent-orange)";
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = "var(--border-color)";
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "1rem",
-            flexWrap: "wrap"
-          }}
-        >
-          <div style={{ fontSize: "0.84rem", color: "var(--text-muted)", lineHeight: 1.65 }}>
-            当前确认页只保留对本场有用的关键信息。若你想回看摘要，可返回配置页查看上传区下方的文本框。
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexShrink: 0 }}>
-            <button
-              onClick={() => router.push("/setup")}
-              style={{
-                padding: "0.75rem 1.5rem",
-                backgroundColor: "transparent",
-                color: "var(--text-muted)",
-                border: "1px solid var(--border-color)",
-                borderRadius: "30px",
-                fontSize: "0.95rem",
-                fontWeight: 500,
-                fontFamily: "var(--font-ui)",
-                cursor: "pointer",
-                transition: "var(--transition)",
-                height: "56px"
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--bg-surface)";
-                e.currentTarget.style.color = "var(--text-dark)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "var(--text-muted)";
-              }}
-            >
-              返回修改
-            </button>
-
-            <button
-              onClick={handleEnterRoom}
-              style={{
-                fontSize: "0.98rem",
-                padding: "0 1.85rem",
-                borderRadius: "30px",
-                backgroundColor: canEnterRoom ? "var(--accent-orange)" : "var(--border-strong)",
-                color: "white",
-                border: "none",
-                fontWeight: 600,
-                fontFamily: "var(--font-ui)",
-                boxShadow: canEnterRoom ? "0 4px 15px rgba(217, 119, 87, 0.25)" : "none",
-                cursor: canEnterRoom ? "pointer" : "not-allowed",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                transition: "var(--transition)",
-                height: "56px"
-              }}
-              disabled={!canEnterRoom}
-              onMouseEnter={(e) => {
-                if (!canEnterRoom) {
-                  return;
-                }
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(217, 119, 87, 0.3)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = canEnterRoom
-                  ? "0 4px 15px rgba(217, 119, 87, 0.25)"
-                  : "none";
-              }}
-            >
-              确认并进入面试
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </button>
-          </div>
+          </footer>
         </div>
       </div>
     </section>
